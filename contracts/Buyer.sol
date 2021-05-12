@@ -138,11 +138,8 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         view
         returns (uint)
     {
-        BPool bPool = BPool(pool);
-
         // Spot price - how much of tokenIn you have to pay for one of tokenOut.
-
-        return bPool.getSpotPrice(_weth, poolToken).mul(100 + slippage).div(100);
+        return 10**18;
     }
 
     function _calcWeiForToken(
