@@ -48,11 +48,12 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         payable
         nonReentrant
     {
-        require(pool != address(0));
+        require(pool != address(0), "WRONG_POOL_ADDRESS");
 
         address[] memory poolTokens = BPool(pool).getCurrentTokens();
+
         uint[] memory maxAmountsIn = new uint[](poolTokens.length);
-        (uint[] memory weiForToken, uint[] memory maxPrices) = _calcWeiForToken(
+        (uint[] memory weiForTokens, uint[] memory maxPrices) = _calcWeiForToken(
             pool,
             poolTokens,
             slippage,
@@ -61,8 +62,8 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
 
         for (uint i = 0; i < poolTokens.length; i++) {
             if (poolTokens[i] == _weth) {
-                IWETH(_weth).deposit{value : weiForToken[i]}();
-                _balances[msg.sender][_weth] = _balances[msg.sender][_weth].add(weiForToken[i]);
+                IWETH(_weth).deposit{value : weiForTokens[i]}();
+                _balances[msg.sender][_weth] = _balances[msg.sender][_weth].add(weiForTokens[i]);
                 continue;
             }
 
@@ -70,8 +71,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
             path[0] = _weth;
             path[1] = poolTokens[i];
 
-            maxAmountsIn[i] = weiForToken[i].div(maxPrices[i]);
-            uint[] memory amounts = IPancakeRouter01(_pancakeRouter).swapETHForExactTokens{value: weiForToken[i]}(
+            maxAmountsIn[i] = weiForTokens[i].div(maxPrices[i]);
+
+            uint[] memory amounts = IPancakeRouter01(_pancakeRouter).swapETHForExactTokens{value: weiForTokens[i]}(
                 maxAmountsIn[i],
                 path,
                 address(this),
