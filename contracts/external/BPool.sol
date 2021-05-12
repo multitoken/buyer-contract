@@ -11,7 +11,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.6.12;
+pragma solidity 0.5.12;
 
 import "./BToken.sol";
 import "./BMath.sol";
@@ -56,21 +56,6 @@ contract BPool is BBronze, BToken, BMath {
         _;
     }
 
-    modifier _onlyController_() {
-        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
-        _;
-    }
-
-    modifier _notUnderConstruct_() {
-        require(!_isUnderConstruct, "ERR_UNDER_CONSTRUCT");
-        _;
-    }
-
-    modifier _underConstruct_() {
-        require(_isUnderConstruct, "ERR_NOT_UNDER_CONSTRUCT");
-        _;
-    }
-
     modifier _lock_() {
         require(!_mutex, "ERR_REENTRY");
         _mutex = true;
@@ -92,10 +77,10 @@ contract BPool is BBronze, BToken, BMath {
     // `setSwapFee` and `finalize` require CONTROL
     // `finalize` sets `PUBLIC can SWAP`, `PUBLIC can JOIN`
     uint private _swapFee;
-    bool private _isUnderConstruct;
+    bool private _finalized;
 
     address[] private _tokens;
-    mapping(address => Record) private  _records;
+    mapping(address=>Record) private  _records;
     uint private _totalWeight;
 
     constructor() public {
@@ -103,7 +88,7 @@ contract BPool is BBronze, BToken, BMath {
         _factory = msg.sender;
         _swapFee = MIN_FEE;
         _publicSwap = false;
-        _isUnderConstruct = true;
+        _finalized = false;
     }
 
     function isPublicSwap()
@@ -113,11 +98,11 @@ contract BPool is BBronze, BToken, BMath {
         return _publicSwap;
     }
 
-    function isConstructed()
+    function isFinalized()
         external view
         returns (bool)
     {
-        return !_isUnderConstruct;
+        return _finalized;
     }
 
     function isBound(address t)
@@ -141,12 +126,12 @@ contract BPool is BBronze, BToken, BMath {
         return _tokens;
     }
 
-    function getPublishedTokens()
+    function getFinalTokens()
         external view
         _viewlock_
-        _notUnderConstruct_
         returns (address[] memory tokens)
     {
+        require(_finalized, "ERR_NOT_FINALIZED");
         return _tokens;
     }
 
@@ -155,6 +140,7 @@ contract BPool is BBronze, BToken, BMath {
         _viewlock_
         returns (uint)
     {
+
         require(_records[token].bound, "ERR_NOT_BOUND");
         return _records[token].denorm;
     }
@@ -172,6 +158,7 @@ contract BPool is BBronze, BToken, BMath {
         _viewlock_
         returns (uint)
     {
+
         require(_records[token].bound, "ERR_NOT_BOUND");
         uint denorm = _records[token].denorm;
         return bdiv(denorm, _totalWeight);
@@ -182,6 +169,7 @@ contract BPool is BBronze, BToken, BMath {
         _viewlock_
         returns (uint)
     {
+
         require(_records[token].bound, "ERR_NOT_BOUND");
         return _records[token].balance;
     }
@@ -206,9 +194,9 @@ contract BPool is BBronze, BToken, BMath {
         external
         _logs_
         _lock_
-        _onlyController_
-        _underConstruct_
     {
+        require(!_finalized, "ERR_IS_FINALIZED");
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         require(swapFee >= MIN_FEE, "ERR_MIN_FEE");
         require(swapFee <= MAX_FEE, "ERR_MAX_FEE");
         _swapFee = swapFee;
@@ -218,57 +206,53 @@ contract BPool is BBronze, BToken, BMath {
         external
         _logs_
         _lock_
-        _onlyController_
     {
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         _controller = manager;
     }
 
-    function setUnderConstruct(bool value)
-        external
-        _onlyController_
-    {
-        _isUnderConstruct = value;
-    }
-
     function setPublicSwap(bool public_)
-        external
+    external
+        _logs_
         _lock_
-        _onlyController_
-        _underConstruct_
     {
+        require(!_finalized, "ERR_IS_FINALIZED");
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         _publicSwap = public_;
     }
 
-    function publish()
-        external
+    function finalize()
+    external
         _logs_
         _lock_
-        _onlyController_
-        _underConstruct_
     {
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
+        require(!_finalized, "ERR_IS_FINALIZED");
         require(_tokens.length >= MIN_BOUND_TOKENS, "ERR_MIN_TOKENS");
 
-        _isUnderConstruct = false;
+        _finalized = true;
         _publicSwap = true;
 
         _mintPoolShare(INIT_POOL_SUPPLY);
         _pushPoolShare(msg.sender, INIT_POOL_SUPPLY);
     }
 
+
     function bind(address token, uint balance, uint denorm)
         external
         _logs_
-        _onlyController_
-        _underConstruct_
         // _lock_  Bind does not lock because it jumps to `rebind`, which does
     {
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         require(!_records[token].bound, "ERR_IS_BOUND");
+        require(!_finalized, "ERR_IS_FINALIZED");
+
         require(_tokens.length < MAX_BOUND_TOKENS, "ERR_MAX_TOKENS");
 
         _records[token] = Record({
             bound: true,
             index: _tokens.length,
-            denorm: 0, // balance and denorm will be validated
+            denorm: 0,    // balance and denorm will be validated
             balance: 0   // and set by `rebind`
             });
         _tokens.push(token);
@@ -279,10 +263,12 @@ contract BPool is BBronze, BToken, BMath {
         public
         _logs_
         _lock_
-        _onlyController_
-        _underConstruct_
     {
+
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         require(_records[token].bound, "ERR_NOT_BOUND");
+        require(!_finalized, "ERR_IS_FINALIZED");
+
         require(denorm >= MIN_WEIGHT, "ERR_MIN_WEIGHT");
         require(denorm <= MAX_WEIGHT, "ERR_MAX_WEIGHT");
         require(balance >= MIN_BALANCE, "ERR_MIN_BALANCE");
@@ -315,10 +301,11 @@ contract BPool is BBronze, BToken, BMath {
         external
         _logs_
         _lock_
-        _onlyController_
-        _underConstruct_
     {
+
+        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
         require(_records[token].bound, "ERR_NOT_BOUND");
+        require(!_finalized, "ERR_IS_FINALIZED");
 
         uint tokenBalance = _records[token].balance;
         uint tokenExitFee = bmul(tokenBalance, EXIT_FEE);
@@ -381,8 +368,9 @@ contract BPool is BBronze, BToken, BMath {
         external
         _logs_
         _lock_
-        _notUnderConstruct_
     {
+        require(_finalized, "ERR_NOT_FINALIZED");
+
         uint poolTotal = totalSupply();
         uint ratio = bdiv(poolAmountOut, poolTotal);
         require(ratio != 0, "ERR_MATH_APPROX");
@@ -405,8 +393,9 @@ contract BPool is BBronze, BToken, BMath {
         external
         _logs_
         _lock_
-        _notUnderConstruct_
     {
+        require(_finalized, "ERR_NOT_FINALIZED");
+
         uint poolTotal = totalSupply();
         uint exitFee = bmul(poolAmountIn, EXIT_FEE);
         uint pAiAfterExitFee = bsub(poolAmountIn, exitFee);
@@ -430,6 +419,7 @@ contract BPool is BBronze, BToken, BMath {
 
     }
 
+
     function swapExactAmountIn(
         address tokenIn,
         uint tokenAmountIn,
@@ -442,6 +432,7 @@ contract BPool is BBronze, BToken, BMath {
         _lock_
         returns (uint tokenAmountOut, uint spotPriceAfter)
     {
+
         require(_records[tokenIn].bound, "ERR_NOT_BOUND");
         require(_records[tokenOut].bound, "ERR_NOT_BOUND");
         require(_publicSwap, "ERR_SWAP_NOT_PUBLIC");
@@ -554,13 +545,14 @@ contract BPool is BBronze, BToken, BMath {
         return (tokenAmountIn, spotPriceAfter);
     }
 
+
     function joinswapExternAmountIn(address tokenIn, uint tokenAmountIn, uint minPoolAmountOut)
         external
         _logs_
         _lock_
-        _notUnderConstruct_
         returns (uint poolAmountOut)
     {
+        require(_finalized, "ERR_NOT_FINALIZED");
         require(_records[tokenIn].bound, "ERR_NOT_BOUND");
         require(tokenAmountIn <= bmul(_records[tokenIn].balance, MAX_IN_RATIO), "ERR_MAX_IN_RATIO");
 
@@ -592,9 +584,9 @@ contract BPool is BBronze, BToken, BMath {
         external
         _logs_
         _lock_
-        _notUnderConstruct_
         returns (uint tokenAmountIn)
     {
+        require(_finalized, "ERR_NOT_FINALIZED");
         require(_records[tokenIn].bound, "ERR_NOT_BOUND");
 
         Record storage inRecord = _records[tokenIn];
@@ -628,9 +620,9 @@ contract BPool is BBronze, BToken, BMath {
         external
         _logs_
         _lock_
-        _notUnderConstruct_
         returns (uint tokenAmountOut)
     {
+        require(_finalized, "ERR_NOT_FINALIZED");
         require(_records[tokenOut].bound, "ERR_NOT_BOUND");
 
         Record storage outRecord = _records[tokenOut];
@@ -666,9 +658,9 @@ contract BPool is BBronze, BToken, BMath {
         external
         _logs_
         _lock_
-        _notUnderConstruct_
         returns (uint poolAmountIn)
     {
+        require(_finalized, "ERR_NOT_FINALIZED");
         require(_records[tokenOut].bound, "ERR_NOT_BOUND");
         require(tokenAmountOut <= bmul(_records[tokenOut].balance, MAX_OUT_RATIO), "ERR_MAX_OUT_RATIO");
 
