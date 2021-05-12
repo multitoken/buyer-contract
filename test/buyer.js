@@ -31,8 +31,23 @@ contract('Buyer', async (accounts) => {
 
   it('buy tokens for shared pool', async () => {
     const sharedPoolAddress = await smartPool.bPool.call()
-    console.log('user1 main currency balance', user1.balance)
-    // await buyer.joinPool(sharedPoolAddress, '100', 99999999999999, { from: user1 })
+    console.log('user1 main currency balance', await web3.eth.getBalance(user1))
+
+    const buyResult = await buyer.buyUnderlyingAssets(
+      sharedPoolAddress,
+      '100', // slippage
+      '99999999999999', // deadline time
+      { from: user1, value: toWei('1') }
+    ) // buy for 1 of eth/bnb
+
+    console.log('buyUnderlyingAssets gas used', buyResult.receipt.gasUsed)
+
+    const joinPoolResult = await buyer.joinPool(
+      sharedPoolAddress,
+      { from: user1}
+    )
+
+    console.log('buyUnderlyingAssets gas used', joinPoolResult.receipt.gasUsed)
   })
 
   function getRandomInt (min, max) {
