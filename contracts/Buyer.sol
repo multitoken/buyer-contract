@@ -30,6 +30,7 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
 
     address private _weth;
     address private _pancakeRouter;
+    mapping(address => mapping(address => uint)) private _balances;
 
     constructor(address weth, address pancakeRouter) public {
         require(weth != address(0));
@@ -38,7 +39,15 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         _pancakeRouter = pancakeRouter;
     }
 
-    function joinPool(address pool, uint slippage, uint deadline) external payable nonReentrant {
+    function buyUnderlyingAssets(
+        address pool,
+        uint slippage,
+        uint deadline
+    )
+        external
+        payable
+        nonReentrant
+    {
         require(pool != address(0));
 
         address[] memory poolTokens = BPool(pool).getCurrentTokens();
@@ -50,32 +59,55 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
             msg.value
         );
 
-        maxAmountsIn[0] = weiForToken[0].div(maxPrices[0]);
-        uint poolAmountOut = _calcLPTAmount1(pool, poolTokens[0], maxAmountsIn[0]);
-
         for (uint i = 0; i < poolTokens.length; i++) {
             if (poolTokens[i] == _weth) {
                 IWETH(_weth).deposit{value : weiForToken[i]}();
+                _balances[msg.sender][_weth] = _balances[msg.sender][_weth].add(weiForToken[i]);
                 continue;
             }
+
             address[] memory path = new address[](2);
             path[0] = _weth;
             path[1] = poolTokens[i];
 
             maxAmountsIn[i] = weiForToken[i].div(maxPrices[i]);
-            IPancakeRouter01(_pancakeRouter).swapETHForExactTokens{value: weiForToken[i]}(
+            uint[] memory amounts = IPancakeRouter01(_pancakeRouter).swapETHForExactTokens{value: weiForToken[i]}(
                 maxAmountsIn[i],
                 path,
                 address(this),
                 deadline
             );
+            _balances[msg.sender][poolTokens[i]] = _balances[msg.sender][poolTokens[i]].add(amounts[1]);
         }
 
-        // TODO Token leftover
+        msg.sender.transfer(address(this).balance);
+    }
 
+    function joinPool(address pool) external nonReentrant {
+        require(pool != address(0));
+        address[] memory poolTokens = BPool(pool).getCurrentTokens();
+        uint[] memory maxAmountsIn = new uint[](poolTokens.length);
+
+        for (uint i = 0; i < poolTokens.length; i++) {
+            maxAmountsIn[i] = _balances[msg.sender][poolTokens[i]];
+            IERC20(poolTokens[i]).approve(pool, maxAmountsIn[i]);
+        }
+
+        uint poolAmountOut = _calcLPTAmount1(pool, poolTokens[0], maxAmountsIn[0]);
         BPool(pool).joinPool(poolAmountOut, maxAmountsIn);
         IERC20(pool).safeTransfer(msg.sender, poolAmountOut);
-        msg.sender.transfer(address(this).balance);
+
+        for (uint i = 0; i < poolTokens.length; i++) {
+            uint currentAllowance = IERC20(poolTokens[i]).allowance(address(this), pool);
+            _balances[msg.sender][poolTokens[i]] = currentAllowance;
+        }
+    }
+
+    function withdraw(address[] calldata tokens) external nonReentrant {
+        for (uint i = 0; i < tokens.length; i++) {
+            IERC20(tokens[i]).transfer(msg.sender, _balances[msg.sender][tokens[i]]);
+            _balances[msg.sender][tokens[i]] = 0;
+        }
     }
 
     function _calcTokenAmountIn(
@@ -83,9 +115,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         uint poolAmountOut,
         address poolToken
     )
-    internal
-    view
-    returns (uint)
+        internal
+        view
+        returns (uint)
     {
         // Based on the BPool.joinPool
         BPool bPool = BPool(pool);
@@ -102,9 +134,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         address poolToken,
         uint slippage
     )
-    internal
-    view
-    returns (uint)
+        internal
+        view
+        returns (uint)
     {
         BPool bPool = BPool(pool);
 
@@ -119,9 +151,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         uint slippage,
         uint value
     )
-    internal
-    view
-    returns (uint[] memory, uint[] memory)
+        internal
+        view
+        returns (uint[] memory, uint[] memory)
     {
         uint[] memory maxPrices = new uint[](poolTokens.length);
         uint maxPricesSum;
@@ -145,9 +177,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         address poolToken,
         uint tokenAmountIn
     )
-    internal
-    view
-    returns (uint)
+        internal
+        view
+        returns (uint)
     {
         BPool bPool = BPool(pool);
         uint poolTotal = bPool.totalSupply();
@@ -160,9 +192,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         address poolToken,
         uint tokenAmountIn
     )
-    internal
-    view
-    returns (uint)
+        internal
+        view
+        returns (uint)
     {
         BPool bPool = BPool(pool);
         uint poolTotal = bPool.totalSupply();
