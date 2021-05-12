@@ -14,8 +14,9 @@
 pragma solidity 0.6.12;
 
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -112,25 +113,6 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         }
     }
 
-    function _calcTokenAmountIn(
-        address pool,
-        uint poolAmountOut,
-        address poolToken
-    )
-        internal
-        view
-        returns (uint)
-    {
-        // Based on the BPool.joinPool
-        BPool bPool = BPool(pool);
-        uint poolTotal = bPool.totalSupply();
-        uint ratio = bdiv(poolAmountOut, poolTotal);
-
-        require(ratio != 0, "ERR_MATH_APPROX");
-
-        return bmul(ratio, bPool.getBalance(poolToken));
-    }
-
     function _calcMaxPrice(
         address pool,
         address poolToken,
@@ -140,11 +122,18 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         view
         returns (uint)
     {
-        BPool bPool = BPool(pool);
-
         // Spot price - how much of tokenIn you have to pay for one of tokenOut.
 
-        return bPool.getSpotPrice(_weth, poolToken).mul(100 + slippage).div(100);
+        address[] memory path = new address[](2);
+        path[0] = _weth;
+        path[1] = poolToken;
+
+        uint[] memory amounts = IPancakeRouter01(_pancakeRouter).getAmountsIn(
+            uint256(10)**ERC20(poolToken).decimals(),
+            path
+        );
+
+        return amounts[0];
     }
 
     function _calcWeiForToken(

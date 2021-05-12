@@ -37,7 +37,7 @@ contract('Buyer', async (accounts) => {
 
     const buyResult = await buyer.buyUnderlyingAssets(
       sharedPoolAddress,
-      '100', // slippage
+      '1', // slippage
       '99999999999999', // deadline time
       { from: user1, value: toWei('1') }
     ) // buy for 1 of eth/bnb

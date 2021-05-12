@@ -61,6 +61,17 @@ contract PancakeRouterMock {
 
         return amountsResult;
     }
+
+    function getAmountsIn(uint amountOut, address[] calldata path)
+        external
+        view
+        returns (uint[] memory amounts)
+    {
+        require(path.length >= 2, 'PancakeLibrary: INVALID_PATH');
+        amounts = new uint[](path.length);
+        amounts[amounts.length - 1] = amountOut;
+        amounts[0] = 10**18;
+    }
 }
 //function swapETHForExactTokens(uint amountOut, address[] calldata path, address to, uint deadline)
 //external
