@@ -11,18 +11,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity 0.6.12;
 
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/ownership/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "./BMath.sol";
-import "./BPool.sol";
-import "./interfaces/IPancakeRouter01.sol";
-import "./interfaces/IWETH.sol";
+import "./external/BMath.sol";
+import "./external/BPool.sol";
+import "./external/interfaces/IPancakeRouter01.sol";
+import "./external/interfaces/IWETH.sol";
 
 contract Buyer is Ownable, ReentrancyGuard, BMath {
     using SafeMath for uint;
@@ -55,7 +55,7 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
 
         for (uint i = 0; i < poolTokens.length; i++) {
             if (poolTokens[i] == _weth) {
-                IWETH(_weth).deposit.value(weiForToken[i])();
+                IWETH(_weth).deposit{value : weiForToken[i]}();
                 continue;
             }
             address[] memory path = new address[](2);
@@ -63,7 +63,7 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
             path[1] = poolTokens[i];
 
             maxAmountsIn[i] = weiForToken[i].div(maxPrices[i]);
-            IPancakeRouter01(_pancakeRouter).swapETHForExactTokens.value(weiForToken[i])(
+            IPancakeRouter01(_pancakeRouter).swapETHForExactTokens{value: weiForToken[i]}(
                 maxAmountsIn[i],
                 path,
                 address(this),
@@ -83,9 +83,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         uint poolAmountOut,
         address poolToken
     )
-        internal
-        view
-        returns (uint)
+    internal
+    view
+    returns (uint)
     {
         // Based on the BPool.joinPool
         BPool bPool = BPool(pool);
@@ -102,9 +102,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         address poolToken,
         uint slippage
     )
-        internal
-        view
-        returns (uint)
+    internal
+    view
+    returns (uint)
     {
         BPool bPool = BPool(pool);
 
@@ -119,9 +119,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         uint slippage,
         uint value
     )
-        internal
-        view
-        returns (uint[] memory, uint[] memory)
+    internal
+    view
+    returns (uint[] memory, uint[] memory)
     {
         uint[] memory maxPrices = new uint[](poolTokens.length);
         uint maxPricesSum;
@@ -145,9 +145,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         address poolToken,
         uint tokenAmountIn
     )
-        internal
-        view
-        returns (uint)
+    internal
+    view
+    returns (uint)
     {
         BPool bPool = BPool(pool);
         uint poolTotal = bPool.totalSupply();
@@ -160,9 +160,9 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         address poolToken,
         uint tokenAmountIn
     )
-        internal
-        view
-        returns (uint)
+    internal
+    view
+    returns (uint)
     {
         BPool bPool = BPool(pool);
         uint poolTotal = bPool.totalSupply();
