@@ -15,6 +15,7 @@ contract('Buyer', async (accounts) => {
   const user2 = accounts[2]
   const tokens = [] // {token, weight, balance}
   const MAX_TOKENS = 20
+  const EXCHANGER_TOKEN_MINT_VALUE = '1000'
   const DEFAULT_SWAP_FEE = '1500000000000000'
   let weth9
   let bFactory
@@ -26,6 +27,7 @@ contract('Buyer', async (accounts) => {
   before(async () => {
     await linkDeployedContracts()
     await createTokens()
+    await mintForExchanger()
     await createPool()
   })
 
@@ -44,7 +46,7 @@ contract('Buyer', async (accounts) => {
 
     const joinPoolResult = await buyer.joinPool(
       sharedPoolAddress,
-      { from: user1}
+      { from: user1 }
     )
 
     console.log('buyUnderlyingAssets gas used', joinPoolResult.receipt.gasUsed)
@@ -69,6 +71,13 @@ contract('Buyer', async (accounts) => {
         weight: '1',
         balance: `${getRandomInt(1, MAX_TOKENS)}`
       })
+    }
+  }
+
+  async function mintForExchanger () {
+    for (const item of tokens) {
+      await item.token.mint(exchanger.address, toWei(EXCHANGER_TOKEN_MINT_VALUE))
+      console.log(`exchanger mint ${tokens.indexOf(item) + 1} of ${tokens.length}`)
     }
   }
 
@@ -106,7 +115,7 @@ contract('Buyer', async (accounts) => {
     for (const item of tokens) {
       await item.token.mint(admin, toWei(item.balance))
       await item.token.approve(smartPool.address, toWei(item.balance))
-      console.log(`mint/approve ${tokens.indexOf(item) + 1} of ${tokens.length}`)
+      console.log(`pool mint/approve ${tokens.indexOf(item) + 1} of ${tokens.length}`)
     }
 
     const createPoolResult = await smartPool.createPool(toWei('150'), '10', '10')
