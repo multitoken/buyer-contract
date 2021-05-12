@@ -50,10 +50,15 @@ contract PancakeRouterMock {
         returns (uint[] memory amounts)
     {
         require(path[0] == WETH, 'PancakeRouter: INVALID_PATH');
+        require(amountOut > 0, 'EXCHANGER_WRONG_AMOUNT_OUT');
+        require(msg.value > 0, 'EXCHANGER_WRONG_AMOUNT_IN');
+
         uint[] memory amountsResult = new uint[](2);
-        address(0x0).transfer(msg.value.mul(90).div(100));
+        amountsResult[0] = msg.value;
+        amountsResult[1] = amountOut;
+
         IERC20(path[1]).transfer(msg.sender, amountOut);
-        msg.sender.transfer(address(this).balance);
+
         return amountsResult;
     }
 }
