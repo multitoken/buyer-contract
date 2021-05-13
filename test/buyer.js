@@ -1,5 +1,6 @@
 const truffleAssert = require('truffle-assertions')
 const BFactory = artifacts.require('BFactory')
+const BPool = artifacts.require('BPool')
 const CRPFactory = artifacts.require('CRPFactory')
 const Exchanger = artifacts.require('PancakeRouterMock')
 const TToken = artifacts.require('TToken')
@@ -18,34 +19,34 @@ contract('Buyer', async (accounts) => {
   const EXCHANGER_TOKEN_MINT_VALUE = '1000'
   const DEFAULT_SWAP_FEE = '1500000000000000'
   let weth9
-  let bFactory
+  let sharedPoolFactory
   let smartPoolFactory
   let exchanger
   let smartPool
+  let sharedPool
   let buyer
 
   before(async () => {
     await linkDeployedContracts()
     await createTokens()
     await mintForExchanger()
-    await createPool()
+    await createSmartPool()
+    await createSharedPool()
   })
 
   it('buy tokens for shared pool', async () => {
-    const sharedPoolAddress = await smartPool.bPool.call()
-    console.log('user1 main currency balance', await web3.eth.getBalance(user1))
-
     const buyResult = await buyer.buyUnderlyingAssets(
-      sharedPoolAddress,
+      sharedPool.address,
       '1', // slippage
       '99999999999999', // deadline time
       { from: user1, value: toWei('1') }
     ) // buy for 1 of eth/bnb
 
+    console.log('totalSupply', await sharedPool.totalSupply.call())
     console.log('buyUnderlyingAssets gas used', buyResult.receipt.gasUsed)
 
     const joinPoolResult = await buyer.joinPool(
-      sharedPoolAddress,
+      sharedPool.address,
       { from: user1 }
     )
 
@@ -58,7 +59,7 @@ contract('Buyer', async (accounts) => {
 
   async function linkDeployedContracts () {
     weth9 = await Weth9.deployed()
-    bFactory = await BFactory.deployed()
+    sharedPoolFactory = await BFactory.deployed()
     smartPoolFactory = await CRPFactory.deployed()
     exchanger = await Exchanger.deployed()
     buyer = await Buyer.deployed()
@@ -85,7 +86,7 @@ contract('Buyer', async (accounts) => {
     console.log('exchanger deposit 1 WETH')
   }
 
-  async function createPool () {
+  async function createSmartPool () {
     const poolParams = {
       constituentTokens: tokens.map(item => item.token.address),
       poolTokenName: `Pancake Top ${MAX_TOKENS}`,
@@ -103,13 +104,13 @@ contract('Buyer', async (accounts) => {
     }
 
     const smartPoolAddress = await smartPoolFactory.newCrp.call(
-      bFactory.address,
+      sharedPoolFactory.address,
       poolParams,
       rights,
     )
 
     const createRawPoolResult = await smartPoolFactory.newCrp(
-      bFactory.address,
+      sharedPoolFactory.address,
       poolParams,
       rights,
     )
@@ -119,10 +120,24 @@ contract('Buyer', async (accounts) => {
     for (const item of tokens) {
       await item.token.mint(admin, toWei(item.balance))
       await item.token.approve(smartPool.address, toWei(item.balance))
-      console.log(`pool mint/approve ${tokens.indexOf(item) + 1} of ${tokens.length}`)
+      console.log(`smart pool mint/approve ${tokens.indexOf(item) + 1} of ${tokens.length}`)
     }
 
     const createPoolResult = await smartPool.createPool(toWei('150'), '10', '10')
-    console.log('createPoolResult gas used', createPoolResult.receipt.gasUsed)
+    console.log('createSmartPoolResult gas used', createPoolResult.receipt.gasUsed)
+  }
+
+  async function createSharedPool () {
+    const sharedPoolAddress = await sharedPoolFactory.newBPool.call()
+    await sharedPoolFactory.newBPool()
+    sharedPool = await BPool.at(sharedPoolAddress)
+
+    for (const item of tokens) {
+      await item.token.mint(admin, toWei(item.balance))
+      await item.token.approve(sharedPool.address, toWei(item.balance))
+      console.log(`shared pool mint/approve ${tokens.indexOf(item) + 1} of ${tokens.length}`)
+      await sharedPool.bind(item.token.address, toWei(item.balance), toWei(item.weight))
+    }
+    await sharedPool.finalize()
   }
 })
