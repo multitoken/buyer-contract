@@ -100,7 +100,7 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
             IERC20(poolTokens[i]).approve(pool, maxAmountsIn[i]);
         }
 
-        uint poolAmountOut = _calcLPTAmount1(pool, poolTokens[0], maxAmountsIn[0]);
+        uint poolAmountOut = _calcLPTAmount1(pool, poolTokens[0], maxAmountsIn[0], isSmartPool);
         BPool(pool).joinPool(poolAmountOut, maxAmountsIn);
         IERC20(pool).safeTransfer(msg.sender, poolAmountOut);
 
@@ -110,7 +110,11 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         }
     }
 
-    function getTokensFromPool(address pool, bool isSmartPool) internal view returns (address[] memory tokens){
+    function getSharedPool(address pool, bool isSmartPool)
+        internal
+        view
+        returns (IBPool sharedPool)
+    {
         IBPool bPool;
 
         if (isSmartPool) {
@@ -119,7 +123,23 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
             bPool = IBPool(pool);
         }
 
-        return bPool.getCurrentTokens();
+        return bPool;
+    }
+
+    function getTokensFromPool(address pool, bool isSmartPool)
+        internal
+        view
+        returns (address[] memory tokens)
+    {
+        return getSharedPool(pool, isSmartPool).getCurrentTokens();
+    }
+
+    function getBalanceFromPool(address pool, bool isSmartPool, address token)
+        internal
+        view
+        returns (uint)
+    {
+        return getSharedPool(pool, isSmartPool).getBalance(token);
     }
 
     function withdraw(address[] calldata tokens) external nonReentrant {
@@ -182,17 +202,20 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
     function _calcLPTAmount1(
         address pool,
         address poolToken,
-        uint tokenAmountIn
+        uint tokenAmountIn,
+        bool isSmartToken
     )
         internal
         view
         returns (uint)
     {
-        BPool bPool = BPool(pool);
-        uint poolTotal = bPool.totalSupply();
+        uint256 poolTotal = ERC20(pool).totalSupply();
 
         require(poolTotal > 0, "WRONG_POOL_TOTAL_SUPPLY");
 
-        return bdiv(bmul(tokenAmountIn, bsub(poolTotal, 1)), badd(bPool.getBalance(poolToken), 1));
+        uint balance = getBalanceFromPool(pool, isSmartToken, poolToken);
+        require(balance > 0, "WRONG_BALANCE");
+
+        return bdiv(bmul(tokenAmountIn, bsub(poolTotal, 1)), badd(balance, 1));
     }
 }
