@@ -176,6 +176,8 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         BPool bPool = BPool(pool);
         uint poolTotal = bPool.totalSupply();
 
+        require(poolTotal > 0, "WRONG_POOL_TOTAL_SUPPLY");
+
         return bdiv(bmul(tokenAmountIn, bsub(poolTotal, 1)), badd(bPool.getBalance(poolToken), 1));
     }
 
@@ -190,6 +192,8 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
     {
         BPool bPool = BPool(pool);
         uint poolTotal = bPool.totalSupply();
+
+        require(poolTotal > 0, "WRONG_POOL_TOTAL_SUPPLY");
 
         return bdiv(bmul(poolTotal, tokenAmountIn), bPool.getBalance(poolToken));
     }
