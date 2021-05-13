@@ -22,6 +22,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./external/BMath.sol";
 import "./external/BPool.sol";
+import "./external/ConfigurableRightsPool.sol";
 import "./external/interfaces/IPancakeRouter01.sol";
 import "./external/interfaces/IWETH.sol";
 
@@ -43,7 +44,8 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
     function buyUnderlyingAssets(
         address pool,
         uint slippage,
-        uint deadline
+        uint deadline,
+        bool isSmartPool
     )
         external
         payable
@@ -52,7 +54,7 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         require(pool != address(0), "WRONG_POOL_ADDRESS");
         require(msg.value > 0, "WRONG_MSG_VALUE");
 
-        address[] memory poolTokens = BPool(pool).getCurrentTokens();
+        address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
 
         uint[] memory maxAmountsIn = new uint[](poolTokens.length);
         (uint[] memory weiForTokens, uint[] memory maxPrices) = _calcWeiForToken(
@@ -87,9 +89,10 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         msg.sender.transfer(address(this).balance);
     }
 
-    function joinPool(address pool) external nonReentrant {
+    function joinPool(address pool, bool isSmartPool) external nonReentrant {
         require(pool != address(0));
-        address[] memory poolTokens = BPool(pool).getCurrentTokens();
+
+        address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
         uint[] memory maxAmountsIn = new uint[](poolTokens.length);
 
         for (uint i = 0; i < poolTokens.length; i++) {
@@ -105,6 +108,18 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
             uint currentAllowance = IERC20(poolTokens[i]).allowance(address(this), pool);
             _balances[msg.sender][poolTokens[i]] = currentAllowance;
         }
+    }
+
+    function getTokensFromPool(address pool, bool isSmartPool) internal view returns (address[] memory tokens){
+        IBPool bPool;
+
+        if (isSmartPool) {
+            bPool = ConfigurableRightsPool(pool).bPool();
+        } else {
+            bPool = IBPool(pool);
+        }
+
+        return bPool.getCurrentTokens();
     }
 
     function withdraw(address[] calldata tokens) external nonReentrant {
@@ -130,7 +145,7 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         path[1] = poolToken;
 
         uint[] memory amounts = IPancakeRouter01(_pancakeRouter).getAmountsIn(
-            uint256(10)**ERC20(poolToken).decimals(),
+            uint256(10) ** ERC20(poolToken).decimals(),
             path
         );
 
