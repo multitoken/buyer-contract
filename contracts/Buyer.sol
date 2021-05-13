@@ -180,21 +180,4 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
 
         return bdiv(bmul(tokenAmountIn, bsub(poolTotal, 1)), badd(bPool.getBalance(poolToken), 1));
     }
-
-    function _calcLPTAmount2(
-        address pool,
-        address poolToken,
-        uint tokenAmountIn
-    )
-        internal
-        view
-        returns (uint)
-    {
-        BPool bPool = BPool(pool);
-        uint poolTotal = bPool.totalSupply();
-
-        require(poolTotal > 0, "WRONG_POOL_TOTAL_SUPPLY");
-
-        return bdiv(bmul(poolTotal, tokenAmountIn), bPool.getBalance(poolToken));
-    }
 }
