@@ -50,6 +50,7 @@ contract Buyer is Ownable, ReentrancyGuard, BMath {
         nonReentrant
     {
         require(pool != address(0), "WRONG_POOL_ADDRESS");
+        require(msg.value > 0, "WRONG_MSG_VALUE");
 
         address[] memory poolTokens = BPool(pool).getCurrentTokens();
 

@@ -70,7 +70,19 @@ contract PancakeRouterMock {
         require(path.length >= 2, 'PancakeLibrary: INVALID_PATH');
         amounts = new uint[](path.length);
         amounts[amounts.length - 1] = amountOut;
-        amounts[0] = 10**18;
+
+        uint reserveIn = ERC20(path[0]).balanceOf(address(this));
+        uint reserveOut = ERC20(path[1]).balanceOf(address(this));
+
+        amounts[0] = getAmountIn(amountOut, reserveIn, reserveOut);
+    }
+
+    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) internal pure returns (uint amountIn) {
+        require(amountOut > 0, 'PancakeLibrary: INSUFFICIENT_OUTPUT_AMOUNT');
+        require(reserveIn > 0 && reserveOut > 0, 'PancakeLibrary: INSUFFICIENT_LIQUIDITY');
+        uint numerator = reserveIn.mul(amountOut).mul(1000);
+        uint denominator = reserveOut.sub(amountOut).mul(998);
+        amountIn = (numerator / denominator).add(1);
     }
 }
 //function swapETHForExactTokens(uint amountOut, address[] calldata path, address to, uint deadline)

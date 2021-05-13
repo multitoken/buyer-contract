@@ -79,6 +79,10 @@ contract('Buyer', async (accounts) => {
       await item.token.mint(exchanger.address, toWei(EXCHANGER_TOKEN_MINT_VALUE))
       console.log(`exchanger mint ${tokens.indexOf(item) + 1} of ${tokens.length}`)
     }
+
+    await weth9.deposit({ value: toWei('1') })
+    await weth9.transfer(exchanger.address, toWei('1'))
+    console.log('exchanger deposit 1 WETH')
   }
 
   async function createPool () {
