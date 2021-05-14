@@ -52,6 +52,8 @@ contract('Buyer', async (accounts) => {
     const joinPoolResult = await buyer.joinPool(
       sharedPool.address,
       /* is smart pool */ false,
+      /* msg value */ buyForAmount,
+      /* slippage */ '1',
       { from: user1 }
     )
 
@@ -73,6 +75,8 @@ contract('Buyer', async (accounts) => {
     const joinPoolResult = await buyer.joinPool(
       smartPool.address,
       /* is smart pool */ true,
+      /* msg value */ buyForAmount,
+      /* slippage */ '1',
       { from: user2 }
     )
 
@@ -95,7 +99,7 @@ contract('Buyer', async (accounts) => {
     for (let i = 0; i < MAX_TOKENS; i++) {
       tokens.push({
         token: await TToken.new(`Token${i}`, `TKN${i}`, 18),
-        weight: '1',
+        weight: `${getRandomInt(1, 3)}`,
         balance: `${getRandomInt(1, MAX_TOKENS)}`
       })
     }
@@ -103,8 +107,9 @@ contract('Buyer', async (accounts) => {
 
   async function mintForExchanger () {
     for (const item of tokens) {
-      await item.token.mint(exchanger.address, toWei(EXCHANGER_TOKEN_MINT_VALUE))
-      console.log(`exchanger mint ${tokens.indexOf(item) + 1} of ${tokens.length}`)
+      const amount = getRandomInt(1000, 5000);
+      await item.token.mint(exchanger.address, toWei(amount.toString()))
+      console.log(`exchanger mint ${tokens.indexOf(item) + 1} of ${tokens.length} (${amount})`)
     }
 
     await weth9.deposit({ value: toWei('1') })
