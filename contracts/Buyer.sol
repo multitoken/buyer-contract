@@ -55,12 +55,6 @@ contract Buyer is Ownable, ReentrancyGuard {
         require(msg.value > 0, "WRONG_MSG_VALUE");
 
         address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
-        (uint[] memory weiForTokens, uint[] memory maxPrices) = _calcWeiForToken(
-            pool,
-            poolTokens,
-            slippage,
-            msg.value
-        );
 
         for (uint i = 0; i < poolTokens.length; i++) {
             (uint weiForToken, uint spotPrice) = _calcWeiForToken(
@@ -161,11 +155,7 @@ contract Buyer is Ownable, ReentrancyGuard {
         }
     }
 
-    function _calcSpotPrice(
-        address pool,
-        address poolToken,
-        uint slippage
-    )
+    function _calcSpotPrice(address poolToken, uint slippage)
         internal
         view
         returns (uint)
@@ -181,11 +171,10 @@ contract Buyer is Ownable, ReentrancyGuard {
             path
         );
 
-        return amounts[0];
+        return amounts[0].mul(100 + slippage).div(100);
     }
 
     function _calcWeiForToken(
-        address pool,
         address[] memory poolTokens,
         uint slippage,
         uint value
@@ -199,7 +188,7 @@ contract Buyer is Ownable, ReentrancyGuard {
         uint[] memory weiForToken = new uint[](poolTokens.length);
 
         for (uint i = 0; i < poolTokens.length; i++) {
-            uint maxPrice = _calcSpotPrice(pool, poolTokens[i], slippage);
+            uint maxPrice = _calcSpotPrice(poolTokens[i], slippage);
             maxPrices[i] = maxPrice;
             maxPricesSum = maxPricesSum.add(maxPrice);
         }
@@ -221,7 +210,6 @@ contract Buyer is Ownable, ReentrancyGuard {
         view
         returns (uint)
     {
-        uint256 poolTotal = ERC20(pool).totalSupply();
         address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
         uint sumWeiForToken;
 
@@ -250,7 +238,7 @@ contract Buyer is Ownable, ReentrancyGuard {
     {
         uint256 poolTotal = ERC20(pool).totalSupply();
         uint tokenBalance = getBalanceFromPool(pool, isSmartPool, poolToken);
-        uint spotPrice = _calcSpotPrice(pool, poolToken, slippage);
+        uint spotPrice = _calcSpotPrice(poolToken, slippage);
         uint weiForToken = tokenBalance.mul(spotPrice).div(poolTotal);
 
         return (spotPrice, weiForToken);

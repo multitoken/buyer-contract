@@ -57,7 +57,14 @@ contract('Buyer', async (accounts) => {
       { from: user1 }
     )
 
-    console.log('shared pool buyUnderlyingAssets gas used', joinPoolResult.receipt.gasUsed)
+    console.log('shared pool joinPool gas used', joinPoolResult.receipt.gasUsed)
+
+    const withdrawResult = await buyer.withdraw(
+      tokens.map(token => token.token.address),
+      { from: user1 }
+    )
+
+    console.log('shared pool withdraw gas used', withdrawResult.receipt.gasUsed)
   })
 
   it('buy tokens for Smart pool', async () => {
@@ -81,6 +88,13 @@ contract('Buyer', async (accounts) => {
     )
 
     console.log('smart pool buyUnderlyingAssets gas used', joinPoolResult.receipt.gasUsed)
+
+    const withdrawResult = await buyer.withdraw(
+      tokens.map(token => token.token.address),
+      { from: user1 }
+    )
+
+    console.log('smart pool withdraw gas used', withdrawResult.receipt.gasUsed)
   })
 
   function getRandomInt (min, max) {
