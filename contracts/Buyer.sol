@@ -74,6 +74,7 @@ contract Buyer is Ownable, ReentrancyGuard {
             path[0] = _weth;
             path[1] = poolTokens[i];
 
+            require(spotPrice > 0, "WRONG_SPOT_PRICE");
             uint[] memory amounts = IPancakeRouter01(_pancakeRouter).swapETHForExactTokens{value: weiForToken}(
                 msg.value.div(spotPrice),
                 path,
@@ -174,32 +175,6 @@ contract Buyer is Ownable, ReentrancyGuard {
         return amounts[0].mul(100 + slippage).div(100);
     }
 
-    function _calcWeiForToken(
-        address[] memory poolTokens,
-        uint slippage,
-        uint value
-    )
-        internal
-        view
-        returns (uint[] memory, uint[] memory)
-    {
-        uint[] memory maxPrices = new uint[](poolTokens.length);
-        uint maxPricesSum;
-        uint[] memory weiForToken = new uint[](poolTokens.length);
-
-        for (uint i = 0; i < poolTokens.length; i++) {
-            uint maxPrice = _calcSpotPrice(poolTokens[i], slippage);
-            maxPrices[i] = maxPrice;
-            maxPricesSum = maxPricesSum.add(maxPrice);
-        }
-
-        for (uint i = 0; i < poolTokens.length; i++) {
-            weiForToken[i] = value.mul(maxPrices[i]).div(maxPricesSum);
-        }
-
-        return (weiForToken, maxPrices);
-    }
-
     function _calcLPTAmount(
         address pool,
         bool isSmartPool,
@@ -236,7 +211,8 @@ contract Buyer is Ownable, ReentrancyGuard {
         view
         returns (uint, uint)
     {
-        uint256 poolTotal = ERC20(pool).totalSupply();
+        uint poolTotal = ERC20(pool).totalSupply();
+        require(poolTotal > 0, "WRONG_POOL_TOTAL");
         uint tokenBalance = getBalanceFromPool(pool, isSmartPool, poolToken);
         uint spotPrice = _calcSpotPrice(poolToken, slippage);
         uint weiForToken = tokenBalance.mul(spotPrice).div(poolTotal);
