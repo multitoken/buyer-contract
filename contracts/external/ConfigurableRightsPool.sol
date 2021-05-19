@@ -233,7 +233,6 @@ contract ConfigurableRightsPool is PCToken, BalancerOwnable, BalancerReentrancyG
         needsBPool
         virtual
     {
-        bPool.finalize();
         rights.canChangeWeights= false;
         rights.canAddRemoveTokens = false;
         rights.canWhitelistLPs = false;

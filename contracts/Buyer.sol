@@ -31,14 +31,14 @@ contract Buyer is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     address private _weth;
-    address private _pancakeRouter;
+    IPancakeRouter01 private _exchanger;
     mapping(address => mapping(address => uint)) private _balances;
 
-    constructor(address weth, address pancakeRouter) public {
-        require(weth != address(0));
-        require(pancakeRouter != address(0));
-        _weth = weth;
-        _pancakeRouter = pancakeRouter;
+    constructor(address exchanger) public {
+        require(exchanger != address(0));
+
+        _exchanger = IPancakeRouter01(exchanger);
+        _weth = _exchanger.WETH();
     }
 
     function buyUnderlyingAssets(
@@ -162,15 +162,11 @@ contract Buyer is Ownable, ReentrancyGuard {
         returns (uint)
     {
         // Spot price - how much of tokenIn you have to pay for one of tokenOut.
-
         address[] memory path = new address[](2);
         path[0] = _weth;
         path[1] = poolToken;
 
-        uint[] memory amounts = IPancakeRouter01(_pancakeRouter).getAmountsIn(
-            uint256(10) ** ERC20(poolToken).decimals(),
-            path
-        );
+        uint[] memory amounts = _exchanger.getAmountsIn(uint(10) ** uint(ERC20(poolToken).decimals()), path);
 
         return amounts[0].mul(100 + slippage).div(100);
     }
