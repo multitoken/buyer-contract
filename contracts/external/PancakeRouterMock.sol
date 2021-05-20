@@ -53,13 +53,13 @@ contract PancakeRouterMock {
         require(amountOut > 0, 'EXCHANGER_WRONG_AMOUNT_OUT');
         require(msg.value > 0, 'EXCHANGER_WRONG_AMOUNT_IN');
 
-        uint[] memory amountsResult = new uint[](2);
-        amountsResult[0] = msg.value;
-        amountsResult[1] = amountOut;
+        uint[] memory amounts = new uint[](2);
+        amounts[0] = msg.value;
+        amounts[1] = amountOut;
 
         IERC20(path[1]).transfer(msg.sender, amountOut);
 
-        return amountsResult;
+        return amounts;
     }
 
     function getAmountsIn(uint amountOut, address[] calldata path)
@@ -83,6 +83,11 @@ contract PancakeRouterMock {
         uint numerator = reserveIn.mul(amountOut).mul(1000);
         uint denominator = reserveOut.sub(amountOut).mul(998);
         amountIn = (numerator / denominator).add(1);
+    }
+
+    function withdraw(address token) external {
+        uint balance = IERC20(token).balanceOf(address(this));
+        IERC20(token).transfer(msg.sender, balance);
     }
 }
 //function swapETHForExactTokens(uint amountOut, address[] calldata path, address to, uint deadline)
