@@ -78,8 +78,8 @@ contract Buyer is Ownable, ReentrancyGuard {
             require(address(this).balance >= weiForTokens, "WRONG_BALANCE");
             require(weiForTokens > spotPrices[i], "WRONG_WEI_FOR_TOKENS");
             require(maxAmountsIn[i] > 0, "WRONG_MAX_AMOUNTS_IN");
-            uint[] memory amounts = _exchanger.swapETHForExactTokens{value: weiForTokens}(
-                maxAmountsIn[i],
+            uint[] memory amounts = _exchanger.swapExactETHForTokens{value: weiForTokens}(
+                1,
                 path,
                 address(this),
                 deadline
