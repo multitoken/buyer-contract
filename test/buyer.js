@@ -36,7 +36,7 @@ contract('Buyer', async (accounts) => {
 
   it('buy tokens for Shared pool', async () => {
     const originalBalance = await web3.eth.getBalance(user1)
-    const buyForAmount = toWei('1')
+    const buyForAmount = toWei('0.1')
 
     const buyResult = await buyer.buyUnderlyingAssets(
       sharedPool.address,
@@ -68,7 +68,7 @@ contract('Buyer', async (accounts) => {
   })
 
   it('buy tokens for Smart pool', async () => {
-    const buyForAmount = toWei('1')
+    const buyForAmount = toWei('0.1')
     const buyResult = await buyer.buyUnderlyingAssets(
       smartPool.address,
       /* slippage */ '1',
@@ -121,7 +121,7 @@ contract('Buyer', async (accounts) => {
 
   async function mintForExchanger () {
     for (const item of tokens) {
-      const amount = getRandomInt(1000, 5000);
+      const amount = 5000
       await item.token.mint(exchanger.address, toWei(amount.toString()))
       console.log(`exchanger mint ${tokens.indexOf(item) + 1} of ${tokens.length} (${amount})`)
     }

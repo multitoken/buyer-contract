@@ -13,7 +13,7 @@ module.exports = async function (deployer, network, accounts) {
   if (network === 'development' || network === 'coverage') {
     await deployer.deploy(Weth9)
     await deployer.deploy(PancakeRouterMock, Weth9.address)
-    await deployer.deploy(Buyer, Weth9.address, PancakeRouterMock.address)
+    await deployer.deploy(Buyer, PancakeRouterMock.address)
 
     await deployer.deploy(TMath)
     await deployer.deploy(BFactory)

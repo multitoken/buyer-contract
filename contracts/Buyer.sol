@@ -55,18 +55,18 @@ contract Buyer is Ownable, ReentrancyGuard {
         require(msg.value > 0, "WRONG_MSG_VALUE");
 
         address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
+        (
+            uint lpTokensTotal,
+            uint[] memory maxAmountsIn,
+            uint[] memory spotPrices
+        ) = _calcJoinPoolData(pool, isSmartPool, slippage, msg.value);
 
         for (uint i = 0; i < poolTokens.length; i++) {
-            (uint weiForToken, uint spotPrice) = _calcWeiForToken(
-                pool,
-                isSmartPool,
-                poolTokens[i],
-                slippage
-            );
+            uint weiForTokens = maxAmountsIn[i].mul(spotPrices[i]);
 
             if (poolTokens[i] == _weth) {
-                IWETH(_weth).deposit{value : weiForToken}();
-                _balances[msg.sender][_weth] = _balances[msg.sender][_weth].add(weiForToken);
+                IWETH(_weth).deposit{value: weiForTokens}();
+                _balances[msg.sender][_weth] = _balances[msg.sender][_weth].add(weiForTokens);
                 continue;
             }
 
@@ -74,9 +74,12 @@ contract Buyer is Ownable, ReentrancyGuard {
             path[0] = _weth;
             path[1] = poolTokens[i];
 
-            require(spotPrice > 0, "WRONG_SPOT_PRICE");
-            uint[] memory amounts = IPancakeRouter01(_pancakeRouter).swapETHForExactTokens{value: weiForToken}(
-                msg.value.div(spotPrice),
+            require(spotPrices[i] > 0, "WRONG_SPOT_PRICE");
+            require(address(this).balance >= weiForTokens, "WRONG_BALANCE");
+            require(weiForTokens > spotPrices[i], "WRONG_WEI_FOR_TOKENS");
+            require(maxAmountsIn[i] > 0, "WRONG_MAX_AMOUNTS_IN");
+            uint[] memory amounts = _exchanger.swapETHForExactTokens{value: weiForTokens}(
+                maxAmountsIn[i],
                 path,
                 address(this),
                 deadline
@@ -99,17 +102,18 @@ contract Buyer is Ownable, ReentrancyGuard {
         require(pool != address(0));
 
         address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
-        uint[] memory maxAmountsIn = new uint[](poolTokens.length);
+        (
+            uint lpTokensTotal,
+            uint[] memory maxAmountsIn,
+            uint[] memory spotPrices
+        ) = _calcJoinPoolData(pool, isSmartPool, slippage, msgValue);
 
         for (uint i = 0; i < poolTokens.length; i++) {
-            maxAmountsIn[i] = _balances[msg.sender][poolTokens[i]];
             IERC20(poolTokens[i]).approve(pool, maxAmountsIn[i]);
         }
 
-        uint poolAmountOut = _calcLPTAmount(pool, isSmartPool, msgValue, slippage);
-
-        BPool(pool).joinPool(poolAmountOut, maxAmountsIn);
-        IERC20(pool).safeTransfer(msg.sender, poolAmountOut);
+        BPool(pool).joinPool(lpTokensTotal, maxAmountsIn);
+        IERC20(pool).safeTransfer(msg.sender, lpTokensTotal);
 
         for (uint i = 0; i < poolTokens.length; i++) {
             uint currentAllowance = IERC20(poolTokens[i]).allowance(address(this), pool);
@@ -156,6 +160,59 @@ contract Buyer is Ownable, ReentrancyGuard {
         }
     }
 
+    function _calcJoinPoolData(
+        address pool,
+        bool isSmartPool,
+        uint slippage,
+        uint msgValue
+    )
+        internal
+        view
+        returns (uint, uint[] memory, uint[] memory)
+    {
+        (
+            uint weiForOneLPT,
+            uint[] memory spotPrices,
+            uint[] memory balances
+        ) = _calcWeiForOneLPT(pool, isSmartPool, slippage);
+        uint lpTokensTotal = msgValue.div(weiForOneLPT);
+        uint totalSupply = ERC20(pool).totalSupply();
+
+        address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
+        uint[] memory maxAmountsIn = new uint[](poolTokens.length);
+
+        for (uint i = 0; i < poolTokens.length; i++) {
+            maxAmountsIn[i] = balances[i].mul(lpTokensTotal).div(totalSupply);
+        }
+
+        return (lpTokensTotal, maxAmountsIn, spotPrices);
+    }
+
+    function _calcWeiForOneLPT(
+        address pool,
+        bool isSmartPool,
+        uint slippage
+    )
+        internal
+        view
+        returns (uint, uint[] memory, uint[] memory)
+    {
+        uint weiForOneLPT = 0;
+        IBPool bPool = getSharedPool(pool, isSmartPool);
+        uint totalSupply = ERC20(pool).totalSupply();
+        address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
+        uint[] memory spotPrices = new uint[](poolTokens.length);
+        uint[] memory balances = new uint[](poolTokens.length);
+
+        for (uint i = 0; i < poolTokens.length; i++) {
+            spotPrices[i] = _calcSpotPrice(poolTokens[i], slippage);
+            balances[i] = bPool.getBalance(poolTokens[i]);
+            weiForOneLPT = weiForOneLPT.add(balances[i].mul(spotPrices[i]).div(totalSupply));
+        }
+
+        return (weiForOneLPT, spotPrices, balances);
+    }
+
     function _calcSpotPrice(address poolToken, uint slippage)
         internal
         view
@@ -169,50 +226,5 @@ contract Buyer is Ownable, ReentrancyGuard {
         uint[] memory amounts = _exchanger.getAmountsIn(uint(10) ** uint(ERC20(poolToken).decimals()), path);
 
         return amounts[0].mul(100 + slippage).div(100);
-    }
-
-    function _calcLPTAmount(
-        address pool,
-        bool isSmartPool,
-        uint msgValue,
-        uint slippage
-    )
-        internal
-        view
-        returns (uint)
-    {
-        address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
-        uint sumWeiForToken;
-
-        for (uint i = 0; i < poolTokens.length; i++) {
-            (uint weiForToken, uint spotPrice) = _calcWeiForToken(
-                pool,
-                isSmartPool,
-                poolTokens[i],
-                slippage
-            );
-            sumWeiForToken = sumWeiForToken.add(weiForToken);
-        }
-
-        return msgValue.div(sumWeiForToken);
-    }
-
-    function _calcWeiForToken(
-        address pool,
-        bool isSmartPool,
-        address poolToken,
-        uint slippage
-    )
-        internal
-        view
-        returns (uint, uint)
-    {
-        uint poolTotal = ERC20(pool).totalSupply();
-        require(poolTotal > 0, "WRONG_POOL_TOTAL");
-        uint tokenBalance = getBalanceFromPool(pool, isSmartPool, poolToken);
-        uint spotPrice = _calcSpotPrice(poolToken, slippage);
-        uint weiForToken = tokenBalance.mul(spotPrice).div(poolTotal);
-
-        return (spotPrice, weiForToken);
     }
 }
