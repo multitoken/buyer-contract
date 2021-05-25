@@ -8,12 +8,14 @@ const TMath = artifacts.require('TMath')
 const Weth9 = artifacts.require('WETH9')
 const PancakeRouterMock = artifacts.require('PancakeRouterMock')
 const Buyer = artifacts.require('Buyer')
+const SingleAssetBuyer = artifacts.require('SingleAssetBuyer')
 
 module.exports = async function (deployer, network, accounts) {
   if (network === 'development' || network === 'coverage') {
     await deployer.deploy(Weth9)
     await deployer.deploy(PancakeRouterMock, Weth9.address)
     await deployer.deploy(Buyer, PancakeRouterMock.address)
+    await deployer.deploy(SingleAssetBuyer, PancakeRouterMock.address)
 
     await deployer.deploy(TMath)
     await deployer.deploy(BFactory)

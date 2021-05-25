@@ -25,8 +25,9 @@ import "./external/BPool.sol";
 import "./external/ConfigurableRightsPool.sol";
 import "./external/interfaces/IPancakeRouter01.sol";
 import "./external/interfaces/IWETH.sol";
+import "./SharedPoolBuyer.sol";
 
-contract Buyer is Ownable, ReentrancyGuard {
+contract Buyer is Ownable, ReentrancyGuard, SharedPoolBuyer {
     using SafeMath for uint;
     using SafeERC20 for IERC20;
 
@@ -119,38 +120,6 @@ contract Buyer is Ownable, ReentrancyGuard {
             uint currentAllowance = IERC20(poolTokens[i]).allowance(address(this), pool);
             _balances[msg.sender][poolTokens[i]] = currentAllowance;
         }
-    }
-
-    function getSharedPool(address pool, bool isSmartPool)
-        internal
-        view
-        returns (IBPool sharedPool)
-    {
-        IBPool bPool;
-
-        if (isSmartPool) {
-            bPool = ConfigurableRightsPool(pool).bPool();
-        } else {
-            bPool = IBPool(pool);
-        }
-
-        return bPool;
-    }
-
-    function getTokensFromPool(address pool, bool isSmartPool)
-        internal
-        view
-        returns (address[] memory tokens)
-    {
-        return getSharedPool(pool, isSmartPool).getCurrentTokens();
-    }
-
-    function getBalanceFromPool(address pool, bool isSmartPool, address token)
-        internal
-        view
-        returns (uint)
-    {
-        return getSharedPool(pool, isSmartPool).getBalance(token);
     }
 
     function withdraw(address[] calldata tokens) external nonReentrant {

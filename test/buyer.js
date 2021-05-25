@@ -7,10 +7,12 @@ const TToken = artifacts.require('TToken')
 const Weth9 = artifacts.require('WETH9')
 const ConfigurableRightsPool = artifacts.require('ConfigurableRightsPool')
 const Buyer = artifacts.require('Buyer')
+const SingleAssetBuyer = artifacts.require('SingleAssetBuyer')
 
 contract('Buyer', async (accounts) => {
   const { toWei } = web3.utils
   const { fromWei } = web3.utils
+  const { BN } = web3.utils
   const admin = accounts[0]
   const user1 = accounts[1]
   const user2 = accounts[2]
@@ -25,6 +27,7 @@ contract('Buyer', async (accounts) => {
   let smartPool
   let sharedPool
   let buyer
+  let singleAssetBuyer
 
   before(async () => {
     await linkDeployedContracts()
@@ -34,67 +37,121 @@ contract('Buyer', async (accounts) => {
     await createSharedPool()
   })
 
-  it('buy tokens for Shared pool', async () => {
-    const originalBalance = await web3.eth.getBalance(user1)
-    const buyForAmount = toWei('0.1')
+  describe('SingleAssetBuyer', async () => {
+    it('buy tokens for Shared pool', async () => {
+      const buyForAmount = toWei('0.0001')
 
-    const buyResult = await buyer.buyUnderlyingAssets(
-      sharedPool.address,
-      /* slippage */ '1',
-      /* deadline time */ '99999999999999',
-      /* is smart pool */ false,
-      { from: user1, value: buyForAmount }
-    ) // buy for 1 of eth/bnb
+      const underlyingToken = await singleAssetBuyer.chooseUnderlyingToken(
+        sharedPool.address,
+        /* is smart pool */ false,
+        { from: user1 }
+      )
+      const minPoolAmountOut = await singleAssetBuyer.calcMinPoolAmountOut(
+        sharedPool.address,
+        /* is smart pool */ false,
+        underlyingToken,
+        buyForAmount,
+        { from: user1 }
+      )
+      await singleAssetBuyer.joinPool(
+        sharedPool.address,
+        /* is smart pool */ false,
+        /* underlyingToken */ underlyingToken,
+        /* minPoolAmountOut */ minPoolAmountOut,
+        /* deadline time */ '99999999999999',
+        { from: user1, value: buyForAmount }
+      )
+    })
 
-    console.log('totalSupply', await sharedPool.totalSupply.call())
-    console.log('shared pool buyUnderlyingAssets gas used', buyResult.receipt.gasUsed)
+    it('buy tokens for Smart pool', async () => {
+      const buyForAmount = toWei('0.0001')
 
-    const joinPoolResult = await buyer.joinPool(
-      sharedPool.address,
-      /* is smart pool */ false,
-      /* msg value */ buyForAmount,
-      /* slippage */ '1',
-      { from: user1 }
-    )
-
-    console.log('shared pool joinPool gas used', joinPoolResult.receipt.gasUsed)
-
-    const withdrawResult = await buyer.withdraw(
-      tokens.map(token => token.token.address),
-      { from: user1 }
-    )
-
-    console.log('shared pool withdraw gas used', withdrawResult.receipt.gasUsed)
+      const underlyingToken = await singleAssetBuyer.chooseUnderlyingToken(
+        smartPool.address,
+        /* is smart pool */ true,
+        { from: user1 }
+      )
+      const minPoolAmountOut = await singleAssetBuyer.calcMinPoolAmountOut(
+        smartPool.address,
+        /* is smart pool */ true,
+        underlyingToken,
+        buyForAmount,
+        { from: user1 }
+      )
+      await singleAssetBuyer.joinPool(
+        smartPool.address,
+        /* is smart pool */ true,
+        /* underlyingToken */ underlyingToken,
+        /* minPoolAmountOut */ minPoolAmountOut,
+        /* deadline time */ '99999999999999',
+        { from: user1, value: buyForAmount }
+      )
+    })
   })
 
-  it('buy tokens for Smart pool', async () => {
-    const buyForAmount = toWei('0.1')
-    const buyResult = await buyer.buyUnderlyingAssets(
-      smartPool.address,
-      /* slippage */ '1',
-      /* deadline time */ '99999999999999',
-      /* is smart pool */ true,
-      { from: user2, value: buyForAmount }
-    ) // buy for 1 of eth/bnb
+  describe('Buyer', async () => {
+    it('buy tokens for Shared pool', async () => {
+      const originalBalance = await web3.eth.getBalance(user1)
+      const buyForAmount = toWei('0.1')
 
-    console.log('smart pool buyUnderlyingAssets gas used', buyResult.receipt.gasUsed)
+      const buyResult = await buyer.buyUnderlyingAssets(
+        sharedPool.address,
+        /* slippage */ '1',
+        /* deadline time */ '99999999999999',
+        /* is smart pool */ false,
+        { from: user1, value: buyForAmount }
+      ) // buy for 1 of eth/bnb
 
-    const joinPoolResult = await buyer.joinPool(
-      smartPool.address,
-      /* is smart pool */ true,
-      /* msg value */ buyForAmount,
-      /* slippage */ '1',
-      { from: user2 }
-    )
+      console.log('totalSupply', await sharedPool.totalSupply.call())
+      console.log('shared pool buyUnderlyingAssets gas used', buyResult.receipt.gasUsed)
 
-    console.log('smart pool buyUnderlyingAssets gas used', joinPoolResult.receipt.gasUsed)
+      const joinPoolResult = await buyer.joinPool(
+        sharedPool.address,
+        /* is smart pool */ false,
+        /* msg value */ buyForAmount,
+        /* slippage */ '1',
+        { from: user1 }
+      )
 
-    const withdrawResult = await buyer.withdraw(
-      tokens.map(token => token.token.address),
-      { from: user1 }
-    )
+      console.log('shared pool joinPool gas used', joinPoolResult.receipt.gasUsed)
 
-    console.log('smart pool withdraw gas used', withdrawResult.receipt.gasUsed)
+      const withdrawResult = await buyer.withdraw(
+        tokens.map(token => token.token.address),
+        { from: user1 }
+      )
+
+      console.log('shared pool withdraw gas used', withdrawResult.receipt.gasUsed)
+    })
+
+    it('buy tokens for Smart pool', async () => {
+      const buyForAmount = toWei('0.1')
+      const buyResult = await buyer.buyUnderlyingAssets(
+        smartPool.address,
+        /* slippage */ '1',
+        /* deadline time */ '99999999999999',
+        /* is smart pool */ true,
+        { from: user2, value: buyForAmount }
+      ) // buy for 1 of eth/bnb
+
+      console.log('smart pool buyUnderlyingAssets gas used', buyResult.receipt.gasUsed)
+
+      const joinPoolResult = await buyer.joinPool(
+        smartPool.address,
+        /* is smart pool */ true,
+        /* msg value */ buyForAmount,
+        /* slippage */ '1',
+        { from: user2 }
+      )
+
+      console.log('smart pool buyUnderlyingAssets gas used', joinPoolResult.receipt.gasUsed)
+
+      const withdrawResult = await buyer.withdraw(
+        tokens.map(token => token.token.address),
+        { from: user1 }
+      )
+
+      console.log('smart pool withdraw gas used', withdrawResult.receipt.gasUsed)
+    })
   })
 
   function getRandomInt (min, max) {
@@ -107,6 +164,7 @@ contract('Buyer', async (accounts) => {
     smartPoolFactory = await CRPFactory.deployed()
     exchanger = await Exchanger.deployed()
     buyer = await Buyer.deployed()
+    singleAssetBuyer = await SingleAssetBuyer.deployed()
   }
 
   async function createTokens () {

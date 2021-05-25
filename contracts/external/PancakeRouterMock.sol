@@ -55,9 +55,11 @@ contract PancakeRouterMock {
 
         uint[] memory amounts = new uint[](2);
         amounts[0] = msg.value;
+//        amounts[0] = getAmountsIn(amountOut, path);
         amounts[1] = amountOut;
 
-        IERC20(path[1]).transfer(msg.sender, amountOut);
+        IERC20(path[1]).transfer(to, amountOut);
+//        msg.sender.transfer(address(this).balance);
 
         return amounts;
     }
@@ -91,7 +93,11 @@ contract PancakeRouterMock {
         amounts[0] = getAmountIn(amountOut, reserveIn, reserveOut);
     }
 
-    function getAmountsOut(uint amountIn, address[] memory path) internal view returns (uint[] memory amounts) {
+    function getAmountsOut(uint amountIn, address[] memory path)
+        public
+        view
+        returns (uint[] memory amounts)
+    {
         require(path.length >= 2, 'PancakeLibrary: INVALID_PATH');
         amounts = new uint[](path.length);
         amounts[0] = amountIn;
@@ -123,6 +129,7 @@ contract PancakeRouterMock {
     function withdraw(address token) external {
         uint balance = IERC20(token).balanceOf(address(this));
         IERC20(token).transfer(msg.sender, balance);
+        msg.sender.transfer(address(this).balance);
     }
 }
 //function swapETHForExactTokens(uint amountOut, address[] calldata path, address to, uint deadline)
