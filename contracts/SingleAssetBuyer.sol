@@ -16,15 +16,11 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import "./external/BMath.sol";
 import "./external/BPool.sol";
-import "./external/ConfigurableRightsPool.sol";
 import "./external/interfaces/IPancakeRouter01.sol";
-import "./external/interfaces/IWETH.sol";
 import "./SharedPoolBuyer.sol";
 
 contract SingleAssetBuyer is Ownable, ReentrancyGuard, SharedPoolBuyer, BConst {
