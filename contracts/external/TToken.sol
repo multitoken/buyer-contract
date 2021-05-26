@@ -11,7 +11,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity 0.6.12;
 
 // Test Token
 
@@ -125,6 +125,7 @@ contract TToken {
     }
 
     function transferFrom(address src, address dst, uint amt) external returns (bool) {
+        require(amt <= _allowance[src][msg.sender], "ERR_BTOKEN_BAD_ALLOWANCE");
         require(msg.sender == src || amt <= _allowance[src][msg.sender], "ERR_BTOKEN_BAD_CALLER");
         _move(src, dst, amt);
         if (msg.sender != src && _allowance[src][msg.sender] != uint256(-1)) {

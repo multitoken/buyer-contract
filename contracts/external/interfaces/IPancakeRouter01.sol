@@ -1,4 +1,4 @@
-pragma solidity ^0.5.12;
+pragma solidity ^0.6.12;
 
 interface IPancakeRouter01 {
     function factory() external pure returns (address);

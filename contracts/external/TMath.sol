@@ -11,10 +11,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity 0.5.12;
+pragma solidity 0.6.12;
 
-import "../BMath.sol";
-import "../BNum.sol";
+import "./BMath.sol";
+import "./BNum.sol";
 
 // Contract to wrap internal functions for testing
 
