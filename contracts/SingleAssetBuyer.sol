@@ -37,44 +37,6 @@ contract SingleAssetBuyer is Ownable, ReentrancyGuard, SharedPoolBuyer, BConst {
         _weth = _exchanger.WETH();
     }
 
-    function chooseUnderlyingToken(address pool, bool isSmartPool)
-        external
-        view
-        returns (address)
-    {
-        address[] memory poolTokens = getTokensFromPool(pool, isSmartPool);
-        address resultToken;
-        uint resultPoolAmountOut;
-
-        for (uint i = 0; i < poolTokens.length; i++) {
-            if (poolTokens[i] == _weth) {
-                continue;
-            }
-
-            address[] memory path = new address[](2);
-            path[0] = _weth;
-            path[1] = poolTokens[i];
-
-            uint[] memory amounts = _exchanger.getAmountsOut(1, path);
-            uint poolAmountOut = calcPoolOutGivenSingleIn(
-                pool, isSmartPool, poolTokens[i], amounts[1]
-            );
-
-            if (resultToken == address(0) || resultPoolAmountOut == 0) {
-                resultToken = poolTokens[i];
-                resultPoolAmountOut = poolAmountOut;
-                continue;
-            }
-
-            if (poolAmountOut > resultPoolAmountOut) {
-                resultToken = poolTokens[i];
-                resultPoolAmountOut = poolAmountOut;
-            }
-        }
-
-        return resultToken;
-    }
-
     function calcMinPoolAmountOut(
         address pool,
         bool isSmartPool,
