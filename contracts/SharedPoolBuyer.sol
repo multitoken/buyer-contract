@@ -83,7 +83,7 @@ contract SharedPoolBuyer {
         return bPool.calcPoolOutGivenSingleIn(
             bPool.getBalance(tokenIn),
             bPool.getDenormalizedWeight(tokenIn),
-            bPool.totalSupply(),
+            ERC20(pool).totalSupply(),
             bPool.getTotalDenormalizedWeight(),
             amountIn,
             bPool.getSwapFee()
