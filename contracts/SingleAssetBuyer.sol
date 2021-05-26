@@ -101,7 +101,6 @@ contract SingleAssetBuyer is Ownable, ReentrancyGuard, SharedPoolBuyer, BConst {
 
     function joinPool(
         address pool,
-        bool /*isSmartPool*/,
         address underlyingToken,
         uint minPoolAmountOut,
         uint deadline

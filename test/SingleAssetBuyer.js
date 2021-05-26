@@ -53,7 +53,6 @@ contract('SingleAssetBuyer', async (accounts) => {
     )
     await singleAssetBuyer.joinPool(
       sharedPool.address,
-      /* is smart pool */ false,
       /* underlyingToken */ underlyingToken,
       /* minPoolAmountOut */ minPoolAmountOut,
       /* deadline time */ '99999999999999',
@@ -78,7 +77,6 @@ contract('SingleAssetBuyer', async (accounts) => {
     )
     await singleAssetBuyer.joinPool(
       smartPool.address,
-      /* is smart pool */ true,
       /* underlyingToken */ underlyingToken,
       /* minPoolAmountOut */ minPoolAmountOut,
       /* deadline time */ '99999999999999',
