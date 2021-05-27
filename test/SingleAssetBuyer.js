@@ -37,7 +37,7 @@ contract('SingleAssetBuyer', async (accounts) => {
   })
 
   it('buy tokens for Shared pool', async () => {
-    const buyForAmount = toWei('0.0001')
+    const buyForAmount = toWei('1')
 
     const underlyingToken = await singleAssetBuyer.chooseUnderlyingToken(
       sharedPool.address,
@@ -53,6 +53,7 @@ contract('SingleAssetBuyer', async (accounts) => {
     )
     await singleAssetBuyer.joinPool(
       sharedPool.address,
+      /* is smart pool */ false,
       /* underlyingToken */ underlyingToken,
       /* minPoolAmountOut */ minPoolAmountOut,
       /* deadline time */ '99999999999999',
@@ -61,7 +62,7 @@ contract('SingleAssetBuyer', async (accounts) => {
   })
 
   it('buy tokens for Smart pool', async () => {
-    const buyForAmount = toWei('0.0001')
+    const buyForAmount = toWei('1')
 
     const underlyingToken = await singleAssetBuyer.chooseUnderlyingToken(
       smartPool.address,
@@ -77,6 +78,7 @@ contract('SingleAssetBuyer', async (accounts) => {
     )
     await singleAssetBuyer.joinPool(
       smartPool.address,
+      /* is smart pool */ true,
       /* underlyingToken */ underlyingToken,
       /* minPoolAmountOut */ minPoolAmountOut,
       /* deadline time */ '99999999999999',
