@@ -43,6 +43,32 @@ contract PancakeRouterMock {
 //        );
 //    }
 
+    function swapExactTokensForTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external virtual ensure(deadline) returns (uint[] memory amounts) {
+        amounts = getAmountsOut(amountIn, path);
+        require(amounts[amounts.length - 1] >= amountOutMin, 'PancakeRouter: INSUFFICIENT_OUTPUT_AMOUNT');
+        IERC20(path[0]).transferFrom(msg.sender, address(this), amountIn);
+        IERC20(path[1]).transfer(to, amounts[1]);
+    }
+
+    function swapTokensForExactTokens(
+        uint amountOut,
+        uint amountInMax,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external virtual ensure(deadline) returns (uint[] memory amounts) {
+        amounts = getAmountsIn(amountOut, path);
+        require(amounts[0] <= amountInMax, 'PancakeRouter: EXCESSIVE_INPUT_AMOUNT');
+        IERC20(path[0]).transferFrom(msg.sender, address(this), amounts[0]);
+        IERC20(path[1]).transfer(to, amountOut);
+    }
+
     function swapETHForExactTokens(uint amountOut, address[] calldata path, address to, uint deadline)
         external
         payable
@@ -79,7 +105,7 @@ contract PancakeRouterMock {
     }
 
     function getAmountsIn(uint amountOut, address[] calldata path)
-        external
+        public
         view
         returns (uint[] memory amounts)
     {

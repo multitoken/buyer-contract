@@ -6,9 +6,9 @@ const Exchanger = artifacts.require('PancakeRouterMock')
 const TToken = artifacts.require('TToken')
 const Weth9 = artifacts.require('WETH9')
 const ConfigurableRightsPool = artifacts.require('ConfigurableRightsPool')
-const SingleAssetBuyer = artifacts.require('SingleAssetBuyer')
+const SingleAssetBuyerToken = artifacts.require('SingleAssetBuyerToken')
 
-contract('SingleAssetBuyer', async (accounts) => {
+contract('SingleAssetBuyerToken', async (accounts) => {
   const { toWei } = web3.utils
   const { fromWei } = web3.utils
   const { BN } = web3.utils
@@ -32,59 +32,59 @@ contract('SingleAssetBuyer', async (accounts) => {
     await linkDeployedContracts()
     await createTokens()
     await mintForExchanger()
+    await mintForAddress(user1, 100000)
     await createSmartPool()
     await createSharedPool()
   })
 
-  it('buy tokens for Shared pool', async () => {
-    const buyForAmount = toWei('1')
+  const params = [
+    { isSmartPool: false, isTokenInPool: false },
+    { isSmartPool: true, isTokenInPool: false },
+    { isSmartPool: false, isTokenInPool: true },
+    { isSmartPool: true, isTokenInPool: true }
+  ]
+  const describeTests = ({ isSmartPool, isTokenInPool }) => {
+    describe(`isSmartPool: ${isSmartPool}, isTokenInPool: ${isTokenInPool}`, async () => {
+      it('Does not throw errors', async () => {
+        const pool = isSmartPool ? smartPool : sharedPool
+        const underlyingToken = await singleAssetBuyer.chooseUnderlyingToken(
+          pool.address,
+          isSmartPool,
+          { from: user1 }
+        )
+        let tokenIn = null
+        const amountIn = toWei('1000')
 
-    const underlyingToken = await singleAssetBuyer.chooseUnderlyingToken(
-      sharedPool.address,
-      /* is smart pool */ false,
-      { from: user1 }
-    )
-    const minPoolAmountOut = await singleAssetBuyer.calcMinPoolAmountOut(
-      sharedPool.address,
-      /* is smart pool */ false,
-      underlyingToken,
-      buyForAmount,
-      { from: user1 }
-    )
-    await singleAssetBuyer.joinPool(
-      sharedPool.address,
-      /* is smart pool */ false,
-      /* underlyingToken */ underlyingToken,
-      /* minPoolAmountOut */ minPoolAmountOut,
-      /* deadline time */ '99999999999999',
-      { from: user1, value: buyForAmount }
-    )
-  })
+        if (isTokenInPool) {
+          tokenIn = tokens.filter(token => token.token.address === underlyingToken)[0].token
+        } else {
+          tokenIn = tokens[getRandomInt(0, tokens.length - 1)].token
+        }
 
-  it('buy tokens for Smart pool', async () => {
-    const buyForAmount = toWei('1')
+        await tokenIn.approve(singleAssetBuyer.address, amountIn, { from: user1 })
+        const minPoolAmountOut = await singleAssetBuyer.calcMinPoolAmountOut(
+          pool.address,
+          isSmartPool,
+          underlyingToken,
+          tokenIn.address,
+          amountIn,
+          { from: user1 }
+        )
+        await singleAssetBuyer.joinPool(
+          pool.address,
+          isSmartPool,
+          underlyingToken,
+          minPoolAmountOut,
+          /* deadline time */ '99999999999999',
+          tokenIn.address,
+          amountIn,
+          { from: user1 }
+        )
+      })
+    })
+  }
 
-    const underlyingToken = await singleAssetBuyer.chooseUnderlyingToken(
-      smartPool.address,
-      /* is smart pool */ true,
-      { from: user1 }
-    )
-    const minPoolAmountOut = await singleAssetBuyer.calcMinPoolAmountOut(
-      smartPool.address,
-      /* is smart pool */ true,
-      underlyingToken,
-      buyForAmount,
-      { from: user1 }
-    )
-    await singleAssetBuyer.joinPool(
-      smartPool.address,
-      /* is smart pool */ true,
-      /* underlyingToken */ underlyingToken,
-      /* minPoolAmountOut */ minPoolAmountOut,
-      /* deadline time */ '99999999999999',
-      { from: user1, value: buyForAmount }
-    )
-  })
+  params.forEach(describeTests)
 
   function getRandomInt (min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min
@@ -95,7 +95,7 @@ contract('SingleAssetBuyer', async (accounts) => {
     sharedPoolFactory = await BFactory.deployed()
     smartPoolFactory = await CRPFactory.deployed()
     exchanger = await Exchanger.deployed()
-    singleAssetBuyer = await SingleAssetBuyer.deployed()
+    singleAssetBuyer = await SingleAssetBuyerToken.deployed()
   }
 
   async function createTokens () {
@@ -103,21 +103,27 @@ contract('SingleAssetBuyer', async (accounts) => {
       tokens.push({
         token: await TToken.new(`Token${i}`, `TKN${i}`, 18),
         weight: `${getRandomInt(1, 3)}`,
-        balance: `${getRandomInt(1, MAX_TOKENS)}`
+        balance: `${getRandomInt(10000, 100000)}`
       })
     }
   }
 
   async function mintForExchanger () {
-    for (const item of tokens) {
-      const amount = 5000
-      await item.token.mint(exchanger.address, toWei(amount.toString()))
-      console.log(`exchanger mint ${tokens.indexOf(item) + 1} of ${tokens.length} (${amount})`)
-    }
-
+    await mintForAddress(exchanger.address, 5000);
     await weth9.deposit({ value: toWei('1') })
     await weth9.transfer(exchanger.address, toWei('1'))
     console.log('exchanger deposit 1 WETH')
+  }
+
+  async function mintForAddress (address, amount) {
+    for (const item of tokens) {
+      await item.token.mint(address, toWei(amount.toString()))
+      console.log(`mint ${tokens.indexOf(item) + 1} of ${tokens.length} (${amount})`)
+    }
+
+    await weth9.deposit({ value: toWei('1') })
+    await weth9.transfer(address, toWei('1'))
+    console.log('deposit 1 WETH')
   }
 
   async function createSmartPool () {
