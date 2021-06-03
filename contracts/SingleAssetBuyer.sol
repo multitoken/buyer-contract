@@ -24,12 +24,9 @@ import "./external/BMath.sol";
 import "./external/BPool.sol";
 import "./external/interfaces/IPancakeRouter01.sol";
 
-contract SingleAssetBuyer is Ownable, ReentrancyGuard, SharedPoolBuyer, BConst, BMath {
-    using SafeMath for uint;
-    using SafeERC20 for IERC20;
-
-    address private _weth;
-    IPancakeRouter01 private _exchanger;
+contract SingleAssetBuyer is SharedPoolBuyer, BConst, BMath {
+    address internal _weth;
+    IPancakeRouter01 internal _exchanger;
 
     event Received(address sender, uint amount);
 
@@ -80,85 +77,6 @@ contract SingleAssetBuyer is Ownable, ReentrancyGuard, SharedPoolBuyer, BConst, 
         }
 
         return resultToken;
-    }
-
-    function calcMinPoolAmountOut(
-        address pool,
-        bool isSmartPool,
-        address underlyingToken,
-        uint weiAmountIn
-    )
-        external
-        view
-        returns (uint)
-    {
-        require(underlyingToken != _weth, "WRONG_UNDERLYING_TOKEN");
-
-        address[] memory path = new address[](2);
-        path[0] = _weth;
-        path[1] = underlyingToken;
-
-        uint[] memory amounts = _exchanger.getAmountsOut(weiAmountIn, path);
-        uint tokenIn = amounts[1];
-        uint maxTokenIn = _calcMaxTokenIn(pool, isSmartPool, underlyingToken);
-
-        if (maxTokenIn < tokenIn) {
-            tokenIn = maxTokenIn;
-        }
-
-        uint poolAmountOut = calcPoolOutGivenSingleIn(
-            pool, isSmartPool, underlyingToken, tokenIn
-        );
-
-        return poolAmountOut;
-    }
-
-    function joinPool(
-        address pool,
-        bool isSmartPool,
-        address underlyingToken,
-        uint minPoolAmountOut,
-        uint deadline
-    )
-        external
-        payable
-        nonReentrant
-    {
-        require(pool != address(0), "WRONG_POOL_ADDRESS");
-        require(msg.value > 0, "WRONG_MSG_VALUE");
-        require(underlyingToken != _weth, "WRONG_UNDERLYING_TOKEN");
-
-        address[] memory path = new address[](2);
-        path[0] = _weth;
-        path[1] = underlyingToken;
-
-        uint maxTokenIn = _calcMaxTokenIn(pool, isSmartPool, underlyingToken);
-        uint[] memory swapAmountsOut = _exchanger.getAmountsOut(msg.value, path);
-        uint[] memory amounts;
-
-        if (swapAmountsOut[1] > maxTokenIn) {
-            amounts = _exchanger.swapETHForExactTokens{value: msg.value}(
-                maxTokenIn,
-                path,
-                address(this),
-                deadline
-            );
-        } else {
-            amounts = _exchanger.swapExactETHForTokens{value: msg.value}(
-                1,
-                path,
-                address(this),
-                deadline
-            );
-        }
-
-        IERC20(underlyingToken).safeIncreaseAllowance(pool, amounts[1]);
-        uint poolAmountOut = BPool(pool).joinswapExternAmountIn(
-            underlyingToken, amounts[1], minPoolAmountOut
-        );
-        require(poolAmountOut >= minPoolAmountOut, "WRONG_POOL_AMOUNT_OUT");
-        IERC20(pool).safeTransfer(msg.sender, poolAmountOut);
-        msg.sender.transfer(address(this).balance);
     }
 
     function _calcMaxTokenIn(

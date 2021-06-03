@@ -7,13 +7,15 @@ const BalancerSafeMathMock = artifacts.require('BalancerSafeMathMock')
 const TMath = artifacts.require('TMath')
 const Weth9 = artifacts.require('WETH9')
 const PancakeRouterMock = artifacts.require('PancakeRouterMock')
-const SingleAssetBuyer = artifacts.require('SingleAssetBuyer')
+const SingleAssetBuyerEther = artifacts.require('SingleAssetBuyerEther')
+const SingleAssetBuyerToken = artifacts.require('SingleAssetBuyerToken')
 
 module.exports = async function (deployer, network, accounts) {
   if (network === 'development' || network === 'coverage') {
     await deployer.deploy(Weth9)
     await deployer.deploy(PancakeRouterMock, Weth9.address)
-    await deployer.deploy(SingleAssetBuyer, PancakeRouterMock.address)
+    await deployer.deploy(SingleAssetBuyerEther, PancakeRouterMock.address)
+    await deployer.deploy(SingleAssetBuyerToken, PancakeRouterMock.address)
 
     await deployer.deploy(TMath)
     await deployer.deploy(BFactory)
