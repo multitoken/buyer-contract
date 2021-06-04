@@ -25,7 +25,7 @@ contract SingleAssetBuyerToken is Ownable, ReentrancyGuard, SingleAssetBuyer {
     using SafeMath for uint;
     using SafeERC20 for IERC20;
 
-    constructor(address exchanger) SingleAssetBuyer(exchanger) public {}
+    constructor(address exchanger_) SingleAssetBuyer(exchanger_) public {}
 
     function calcMinPoolAmountOut(
         address pool,
@@ -38,18 +38,33 @@ contract SingleAssetBuyerToken is Ownable, ReentrancyGuard, SingleAssetBuyer {
         view
         returns (uint)
     {
-        require(underlyingToken != _weth, "WRONG_UNDERLYING_TOKEN");
+        require(underlyingToken != weth, "WRONG_UNDERLYING_TOKEN");
 
-        address[] memory path = new address[](2);
-        path[0] = tokenIn;
-        path[1] = underlyingToken;
-
-        uint[] memory amounts = _exchanger.getAmountsOut(tokenAmountIn, path);
         uint maxUnderlyingIn = _calcMaxTokenIn(pool, isSmartPool, underlyingToken);
-        uint underlyingAmountIn = amounts[1];
+        uint underlyingAmountIn;
 
-        if (underlyingAmountIn > maxUnderlyingIn) {
-            underlyingAmountIn = maxUnderlyingIn;
+        if (tokenIn == underlyingToken) {
+            if (maxUnderlyingIn > tokenAmountIn) {
+                underlyingAmountIn = tokenAmountIn;
+            } else {
+                underlyingAmountIn = maxUnderlyingIn;
+            }
+        } else {
+            address[] memory tokenInToWeth = new address[](2);
+            tokenInToWeth[0] = tokenIn;
+            tokenInToWeth[1] = weth;
+            uint wethAmountOut = exchanger.getAmountsOut(tokenAmountIn, tokenInToWeth)[1];
+
+            address[] memory wethToUnderlying = new address[](2);
+            wethToUnderlying[0] = weth;
+            wethToUnderlying[1] = underlyingToken;
+            uint underlyingAmountOut = exchanger.getAmountsOut(wethAmountOut, wethToUnderlying)[1];
+
+            if (underlyingAmountOut > maxUnderlyingIn) {
+                underlyingAmountIn = maxUnderlyingIn;
+            } else {
+                underlyingAmountIn = underlyingAmountOut;
+            }
         }
 
         return calcPoolOutGivenSingleIn(pool, isSmartPool, underlyingToken, underlyingAmountIn);
@@ -70,7 +85,7 @@ contract SingleAssetBuyerToken is Ownable, ReentrancyGuard, SingleAssetBuyer {
         require(pool != address(0), "WRONG_POOL_ADDRESS");
         require(tokenIn != address(0), "WRONG_TOKEN_IN");
         require(tokenAmountIn > 0, "WRONG_TOKEN_AMOUNT_IN");
-        require(underlyingToken != _weth, "WRONG_UNDERLYING_TOKEN");
+        require(underlyingToken != weth, "WRONG_UNDERLYING_TOKEN");
         require(minPoolAmountOut > 0, "WRONG_MIN_POOL_AMOUNT_OUT");
 
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), tokenAmountIn);
@@ -85,29 +100,53 @@ contract SingleAssetBuyerToken is Ownable, ReentrancyGuard, SingleAssetBuyer {
                 joinAmountIn = maxUnderlyingTokenIn;
             }
         } else {
-            IERC20(tokenIn).safeApprove(address(_exchanger), tokenAmountIn);
+            address[] memory tokenInToWeth = new address[](2);
+            tokenInToWeth[0] = tokenIn;
+            tokenInToWeth[1] = weth;
+            uint wethAmountOut = exchanger.getAmountsOut(tokenAmountIn, tokenInToWeth)[1];
 
-            address[] memory path = new address[](2);
-            path[0] = tokenIn;
-            path[1] = underlyingToken;
+            address[] memory wethToUnderlying = new address[](2);
+            wethToUnderlying[0] = weth;
+            wethToUnderlying[1] = underlyingToken;
+            uint underlyingAmountOut = exchanger.getAmountsOut(wethAmountOut, wethToUnderlying)[1];
 
-            uint[] memory swapAmountsOut = _exchanger.getAmountsOut(tokenAmountIn, path);
+            IERC20(tokenIn).safeApprove(address(exchanger), tokenAmountIn);
+            IERC20(weth).safeApprove(address(exchanger), wethAmountOut);
 
-            if (swapAmountsOut[1] > maxUnderlyingTokenIn) {
-                uint[] memory amounts = _exchanger.swapTokensForExactTokens(
-                    maxUnderlyingTokenIn,
-                    tokenAmountIn,
-                    path,
+            if (underlyingAmountOut > maxUnderlyingTokenIn) {
+                uint[] memory amounts;
+
+                amounts = exchanger.swapTokensForExactTokens(
+                    wethAmountOut, // amountOut
+                    tokenAmountIn, // amountInMax
+                    tokenInToWeth,
+                    address(this),
+                    deadline
+                );
+                amounts = exchanger.swapTokensForExactTokens(
+                    maxUnderlyingTokenIn, // amountOut
+                    wethAmountOut, // amountInMax
+                    wethToUnderlying,
                     address(this),
                     deadline
                 );
                 joinAmountIn = amounts[1];
-                IERC20(tokenIn).safeApprove(address(_exchanger), 0);
+                IERC20(tokenIn).safeApprove(address(exchanger), 0);
+                IERC20(weth).safeApprove(address(exchanger), 0);
             } else {
-                uint[] memory amounts = _exchanger.swapExactTokensForTokens(
-                    tokenAmountIn,
+                uint[] memory amounts;
+
+                amounts = exchanger.swapExactTokensForTokens(
+                    tokenAmountIn, // amountIn
                     1, // amountOutMin
-                    path,
+                    tokenInToWeth,
+                    address(this),
+                    deadline
+                );
+                amounts = exchanger.swapExactTokensForTokens(
+                    amounts[1], // amountIn
+                    1, // amountOutMin
+                    wethToUnderlying,
                     address(this),
                     deadline
                 );
@@ -122,5 +161,6 @@ contract SingleAssetBuyerToken is Ownable, ReentrancyGuard, SingleAssetBuyer {
         require(poolAmountOut >= minPoolAmountOut, "WRONG_POOL_AMOUNT_OUT");
         IERC20(pool).safeTransfer(msg.sender, poolAmountOut);
         IERC20(tokenIn).safeTransfer(msg.sender, IERC20(tokenIn).balanceOf(address(this)));
+        IERC20(weth).safeTransfer(msg.sender, IERC20(weth).balanceOf(address(this)));
     }
 }

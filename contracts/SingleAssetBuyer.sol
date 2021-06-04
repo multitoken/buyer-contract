@@ -25,16 +25,16 @@ import "./external/BPool.sol";
 import "./external/interfaces/IPancakeRouter01.sol";
 
 contract SingleAssetBuyer is SharedPoolBuyer, BConst, BMath {
-    address internal _weth;
-    IPancakeRouter01 internal _exchanger;
+    address public weth;
+    IPancakeRouter01 public exchanger;
 
     event Received(address sender, uint amount);
 
-    constructor(address exchanger) public {
-        require(exchanger != address(0));
+    constructor(address exchanger_) public {
+        require(exchanger_ != address(0));
 
-        _exchanger = IPancakeRouter01(exchanger);
-        _weth = _exchanger.WETH();
+        exchanger = IPancakeRouter01(exchanger_);
+        weth = exchanger.WETH();
     }
 
     receive() external payable {
@@ -51,15 +51,15 @@ contract SingleAssetBuyer is SharedPoolBuyer, BConst, BMath {
         uint resultPoolAmountOut;
 
         for (uint i = 0; i < poolTokens.length; i++) {
-            if (poolTokens[i] == _weth) {
+            if (poolTokens[i] == weth) {
                 continue;
             }
 
             address[] memory path = new address[](2);
-            path[0] = _weth;
+            path[0] = weth;
             path[1] = poolTokens[i];
 
-            uint[] memory amounts = _exchanger.getAmountsOut(1, path);
+            uint[] memory amounts = exchanger.getAmountsOut(1, path);
             uint poolAmountOut = calcPoolOutGivenSingleIn(
                 pool, isSmartPool, poolTokens[i], amounts[1]
             );

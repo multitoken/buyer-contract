@@ -25,7 +25,7 @@ contract SingleAssetBuyerEther is Ownable, ReentrancyGuard, SingleAssetBuyer {
     using SafeMath for uint;
     using SafeERC20 for IERC20;
 
-    constructor(address exchanger) SingleAssetBuyer(exchanger) public {}
+    constructor(address exchanger_) SingleAssetBuyer(exchanger_) public {}
 
     function calcMinPoolAmountOut(
         address pool,
@@ -37,13 +37,13 @@ contract SingleAssetBuyerEther is Ownable, ReentrancyGuard, SingleAssetBuyer {
         view
         returns (uint)
     {
-        require(underlyingToken != _weth, "WRONG_UNDERLYING_TOKEN");
+        require(underlyingToken != weth, "WRONG_UNDERLYING_TOKEN");
 
         address[] memory path = new address[](2);
-        path[0] = _weth;
+        path[0] = weth;
         path[1] = underlyingToken;
 
-        uint[] memory amounts = _exchanger.getAmountsOut(weiAmountIn, path);
+        uint[] memory amounts = exchanger.getAmountsOut(weiAmountIn, path);
         uint maxUnderlyingIn = _calcMaxTokenIn(pool, isSmartPool, underlyingToken);
         uint underlyingAmountIn = amounts[1];
 
@@ -67,25 +67,25 @@ contract SingleAssetBuyerEther is Ownable, ReentrancyGuard, SingleAssetBuyer {
     {
         require(pool != address(0), "WRONG_POOL_ADDRESS");
         require(msg.value > 0, "WRONG_MSG_VALUE");
-        require(underlyingToken != _weth, "WRONG_UNDERLYING_TOKEN");
+        require(underlyingToken != weth, "WRONG_UNDERLYING_TOKEN");
 
         address[] memory path = new address[](2);
-        path[0] = _weth;
+        path[0] = weth;
         path[1] = underlyingToken;
 
         uint maxTokenIn = _calcMaxTokenIn(pool, isSmartPool, underlyingToken);
-        uint[] memory swapAmountsOut = _exchanger.getAmountsOut(msg.value, path);
+        uint[] memory swapAmountsOut = exchanger.getAmountsOut(msg.value, path);
         uint[] memory amounts;
 
         if (swapAmountsOut[1] > maxTokenIn) {
-            amounts = _exchanger.swapETHForExactTokens{value: msg.value}(
+            amounts = exchanger.swapETHForExactTokens{value: msg.value}(
                 maxTokenIn,
                 path,
                 address(this),
                 deadline
             );
         } else {
-            amounts = _exchanger.swapExactETHForTokens{value: msg.value}(
+            amounts = exchanger.swapExactETHForTokens{value: msg.value}(
                 1,
                 path,
                 address(this),
