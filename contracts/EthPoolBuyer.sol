@@ -52,7 +52,9 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
 
         for (uint i = 0; i < poolTokens.length; i++) {
             buyToken(poolTokens[i].token, poolTokens[i].amount, poolTokens[i].ethPrice, deadline);
+
             IERC20(poolTokens[i].token).safeApprove(pool, poolTokens[i].amount);
+
             tokensIn[i] = poolTokens[i].amount;
         }
 
@@ -70,8 +72,8 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
     returns (PoolToken[] memory, uint256)
     {
         IBPool bPool = getSharedPool(pool, isSmartPool);
-        address[] memory tokens = bPool.getCurrentTokens();
 
+        address[] memory tokens = bPool.getCurrentTokens();
         PoolToken[] memory result = new PoolToken[](tokens.length);
         PoolToken memory expensiveToken = result[0];
 
@@ -90,9 +92,9 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
         for (uint i = 0; i < tokens.length; i++) {
             if (result[i].token != expensiveToken.token) {
                 result[i].amount = result[i].poolBalance
-                .mul(expensiveToken.amount.add(expensiveToken.poolBalance))
-                .div(expensiveToken.poolBalance)
-                .sub(result[i].poolBalance);
+                    .mul(expensiveToken.amount.add(expensiveToken.poolBalance))
+                    .div(expensiveToken.poolBalance)
+                    .sub(result[i].poolBalance);
 
                 result[i].ethPrice = getTokenPriceInWei(result[i].token, result[i].amount);
 
@@ -105,9 +107,9 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
 
         uint256 currentSupply = IPool(pool).totalSupply();
         uint256 poolAmountOut = currentSupply
-        .mul(expensiveToken.amount.add(expensiveToken.poolBalance))
-        .div(expensiveToken.poolBalance)
-        .sub(currentSupply);
+            .mul(expensiveToken.amount.add(expensiveToken.poolBalance))
+            .div(expensiveToken.poolBalance)
+            .sub(currentSupply);
 
         // Subtract  1 to ensure any rounding errors favor the pool
         uint ratio = BalancerSafeMath.bdiv(poolAmountOut, BalancerSafeMath.bsub(currentSupply, 1));
