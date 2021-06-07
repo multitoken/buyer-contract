@@ -73,7 +73,7 @@ contract PancakeRouterMock {
         external
         payable
         ensure(deadline)
-        returns (uint[] memory amounts)
+        returns (uint[] memory)
     {
         require(path[0] == WETH, 'PancakeRouter: INVALID_PATH');
         require(amountOut > 0, 'EXCHANGER_WRONG_AMOUNT_OUT');
