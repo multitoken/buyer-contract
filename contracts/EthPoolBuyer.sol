@@ -25,6 +25,7 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
     struct PoolToken {
         address token;
         uint256 amount;
+        uint256 amountForFixedPrice;
         uint256 poolBalance;
         uint256 ethPrice;
     }
@@ -79,7 +80,8 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
 
         for (uint i = 0; i < tokens.length; i++) {
             result[i].token = tokens[i];
-            result[i].amount = getTokenEthPrice(result[i].token, ethValue);
+            result[i].amount = getTokenAmountByWei(result[i].token, ethValue);
+            result[i].amountForFixedPrice = result[i].amount;
             result[i].poolBalance = bPool.getBalance(result[i].token);
 
             if (result[i].amount <= expensiveToken.amount) {
@@ -87,7 +89,7 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
             }
         }
 
-        uint256 tokensPriceSum = 0;
+        expensiveToken.ethPrice = ethValue;
 
         for (uint i = 0; i < tokens.length; i++) {
             if (result[i].token != expensiveToken.token) {
@@ -96,14 +98,13 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
                     .div(expensiveToken.poolBalance)
                     .sub(result[i].poolBalance);
 
-                result[i].ethPrice = getTokenPriceInWei(result[i].token, result[i].amount);
+                result[i].ethPrice = result[i].amount.div(result[i].amountForFixedPrice.div(ethValue));
 
-                tokensPriceSum = tokensPriceSum.add(result[i].ethPrice);
+                expensiveToken.ethPrice = expensiveToken.ethPrice.sub(result[i].ethPrice);
             }
         }
 
-        expensiveToken.ethPrice = ethValue.sub(tokensPriceSum);
-        expensiveToken.amount = getTokenEthPrice(expensiveToken.token, expensiveToken.ethPrice);
+        expensiveToken.amount = expensiveToken.amountForFixedPrice.div(ethValue).mul(expensiveToken.ethPrice);
 
         uint256 currentSupply = IPool(pool).totalSupply();
         uint256 poolAmountOut = currentSupply
@@ -116,7 +117,7 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
 
         for (uint i = 0; i < tokens.length; i++) {
             result[i].amount = BalancerSafeMath.bmul(ratio, BalancerSafeMath.badd(result[i].poolBalance, 1));
-            result[i].ethPrice = getTokenPriceInWei(result[i].token, result[i].amount);
+            result[i].ethPrice = result[i].amount.div(result[i].amountForFixedPrice.div(ethValue));
         }
 
         return (result, poolAmountOut);
@@ -151,7 +152,7 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
         return exchangeAmounts[1];
     }
 
-    function getTokenEthPrice(address token, uint256 ethAmount)
+    function getTokenAmountByWei(address token, uint256 ethAmount)
         internal
         view
     returns (uint256)
@@ -163,20 +164,6 @@ contract EthPoolBuyer is Ownable, ReentrancyGuard {
         uint256[] memory amounts = exchanger.getAmountsOut(ethAmount, path);
 
         return amounts[1];
-    }
-
-    function getTokenPriceInWei(address token, uint256 tokenAmount)
-        internal
-        view
-    returns (uint256)
-    {
-        address[] memory path = new address[](2);
-        path[0] = weth;
-        path[1] = token;
-
-        uint256[] memory amounts = exchanger.getAmountsIn(tokenAmount, path);
-
-        return amounts[0];
     }
 
     function getSharedPool(address pool, bool isSmartPool)
